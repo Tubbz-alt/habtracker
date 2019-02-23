@@ -16,21 +16,21 @@ if [ ${ME} != "root" ]; then
 fi
 
 
-echo "Running apt update..."
-apt update
+#echo "Running apt update..."
+#apt update
 
-sleep 2
-echo "Installing alsa-utils..."
-apt install -y  alsa-utils
+#sleep 2
+#echo "Installing alsa-utils..."
+#apt install -y  alsa-utils
 
-sleep 2
-echo "Removing pulseaudio..."
-apt remove -y pulseaudio
+#sleep 2
+#echo "Removing pulseaudio..."
+#apt remove -y pulseaudio
 
 echo "Checking eosstracker permissions and group membership..."
 chown eosstracker:eosstracker /eosstracker
-adduser eosstracker audio
-adduser eosstracker dialout
+#adduser eosstracker audio
+#adduser eosstracker dialout
 
 echo "Cleaning up /eosstracker..."
 cd /eosstracker
@@ -52,8 +52,11 @@ rm www/images/aprs/tocalls.txt
 rm www/images/aprs/tocalls2.bash
 rm www/images/aprs/tocalls3.bash
 rm -rf /eosstracker/.git
-cp -rpa /tmp/eosstracker/.git /eosstracker
-cp -pa /tmp/eosstracker/.gitignore /eosstracker
+cp -rpa /opt/eosstracker/.git /eosstracker
+cp -pa /opt/eosstracker/.gitignore /eosstracker
+
+chown -R eosstracker:eosstracker .git
+chown eosstracker:eosstracker .gitignore
 
 su eosstracker -c "git checkout -- LICENSE"
 su eosstracker -c "git checkout -- README.md"
