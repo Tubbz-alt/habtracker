@@ -33,6 +33,10 @@ chown eosstracker:eosstracker /eosstracker
 #adduser eosstracker dialout
 
 echo "Cleaning up /eosstracker..."
+rm -rf /eosstracker/.git
+cp -rpa ./.git /eosstracker/
+cp -pa ./.gitignore /eosstracker/
+
 cd /eosstracker
 rm bin/COPYING
 rm www/COPYING
@@ -51,9 +55,6 @@ rm www/images/aprs/tocalls.bash
 rm www/images/aprs/tocalls.txt
 rm www/images/aprs/tocalls2.bash
 rm www/images/aprs/tocalls3.bash
-rm -rf /eosstracker/.git
-cp -rpa /opt/eosstracker/.git /eosstracker
-cp -pa /opt/eosstracker/.gitignore /eosstracker
 
 chown -R eosstracker:eosstracker .git
 chown eosstracker:eosstracker .gitignore
