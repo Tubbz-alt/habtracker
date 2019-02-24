@@ -1,0 +1,85 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          habtracker-daemon
+# Required-Start:    $remote_fs $syslog $network
+# Should-Start:      bluetooth dbus udev
+# Required-Stop:     $remote_fs $syslog $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# X-Start-Before:    ntp
+# Short-Description: GPS (Global Positioning System) daemon 
+# Description:       The gpsd service daemon is able to monitor one or
+#                    more GPS devices connected to a host computer, making
+#                    all data on the location and movements of the sensors
+#                    available to be queried on TCP port 2947.
+### END INIT INFO
+
+# Author: EOSS
+#
+# Please remove the "Author" lines above and replace them
+# with your own name if you copy and modify this script.
+
+# Do NOT "set -e"
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/opt/aprsc:/eosstracker/bin
+DESC="HABTracker Daemon"
+NAME=habtracker-daemon
+RUNDIR=/eosstracker/bin
+DAEMON=$RUNDIR/habtracker-daemon.py
+STARTDAEMON=$RUNDIR/start_session.bash
+STOPDAEMON=$RUNDIR/killsession_wrapper.bash
+PIDFILE=$RUNDIR/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+SUDOBIN=/usr/bin/sudo
+SLEEPBIN=/bin/sleep
+DAEMONUSER=eosstracker
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+#
+# Function that starts the daemon/service
+# /usr/bin/sudo -u eosstracker /eosstracker/bin/start_session.bash
+
+do_start()
+{
+	$SUDOBIN -u $DAEMONUSER $STARTDAEMON
+	return 0
+}
+
+#
+# Function that stops the daemon/service
+# /usr/bin/sudo -u eosstracker /eosstracker/bin/killsession_wrapper.bash
+
+do_stop()
+{
+	$SUDOBIN -u $DAEMONUSER $STOPDAEMON
+	return 0
+}
+
+case "$1" in
+  start)
+	do_start
+	;;
+  stop)
+	do_stop
+	;;
+  restart)
+	do_stop
+	$SLEEPBIN 10
+	do_start
+	;;
+  *)
+	echo "Usage: $SCRIPTNAME {start|stop|restart}" >&2
+	exit 3
+	;;
+esac
+
