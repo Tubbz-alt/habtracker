@@ -20,6 +20,10 @@ echo "Running apt update..."
 apt-get update
 echo ""
 
+echo "Running apt upgrade..."
+apt-get -y upgrade
+echo ""
+
 sleep 1
 echo "Installing git and htop..."
 apt-get -y install git git-core htop
