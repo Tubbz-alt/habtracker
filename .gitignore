@@ -1,6 +1,11 @@
 # Ignore the maps, osm, db, and logs directories
 maps/
+osm/README
+osm/data
+osm/symbols
 osm/mapnik.xml
+osm/openstreetmap-carto.lua
+osm/openstreetmap-carto.style
 db/
 logs/*
 lost+found
