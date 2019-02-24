@@ -1512,7 +1512,7 @@ def main():
         # if there are running pids and we didn't get the kill switch, then exit
         if len(pids) > 0:
             print "Processes are running, exiting."
-            sys.exit()
+#            sys.exit()
 
     # --------- end of process checking section ----------
 
@@ -1542,10 +1542,11 @@ def main():
         direwolfFreqList = []
 
         # Get the RTL-SDR USB dongles that are attached
-        sdrs = getNumberOfSDRs()
+#        sdrs = getNumberOfSDRs()
 
         # The number of SDRs
-        i = len(sdrs)
+#        i = len(sdrs)
+        i = 0
  
         print "Number of SDRs: ", i
 
@@ -1563,8 +1564,8 @@ def main():
         # We're assuming the path to this is the standard install path for aprsc, /opt/aprsc/etc/...
         # We always append "01" to the callsign to ensure that it's unique for APRS-IS
         aprsc_configfile = "/opt/aprsc/etc/tracker-aprsc.conf"
-        if createAprscConfig(aprsc_configfile, callsign + "01") < 0:
-            sys.exit()
+#        if createAprscConfig(aprsc_configfile, callsign + "01") < 0:
+#            sys.exit()
        
         # This is the aprsc process
         aprscprocess = mp.Process(target=aprsc, args=(aprsc_configfile, stopevent))

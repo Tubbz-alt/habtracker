@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+#
+#
+
+
+sudo -u eosstracker /eosstracker/bin/start_session.bash
+
+exit 0

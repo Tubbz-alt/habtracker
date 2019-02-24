@@ -58,6 +58,7 @@ LOGDIR=${HOMEDIR}/logs
 HABTRACKERCMD=${BINDIR}/habtracker-daemon.py
 LOGFILE=${LOGDIR}/start_session.log
 STDERR=${LOGFILE}.stderr
+APRSRADIUS=800
 
 
 # Check if things are running:
@@ -81,5 +82,5 @@ echo "###################" >> ${LOGFILE}
 date >> ${LOGFILE}
 echo "###################" >> ${LOGFILE}
 echo "Starting habtracker-daemon.py..." >> ${LOGFILE}
-nohup ${HABTRACKERCMD} --callsign=${CALLSIGN} --algoFloor=${GROUNDLEVEL} >> ${LOGFILE} 2>${STDERR} &
+nohup ${HABTRACKERCMD} --callsign=${CALLSIGN} --algoFloor=${GROUNDLEVEL} --aprsisRadius=${APRSRADIUS} >> ${LOGFILE} 2>${STDERR} &
 
