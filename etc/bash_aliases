@@ -1,0 +1,2 @@
+alias p='ps -ef | egrep "direwolf|aprsc|gpsd|killsession|kill_session|habtracker-daemon" | grep -v grep'
+alias r='cat /eosstracker/sql/shortlist.sql | psql -d aprs'
