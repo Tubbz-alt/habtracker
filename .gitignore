@@ -1,9 +1,9 @@
 # Ignore the maps, osm, db, and logs directories
 maps/
-osm/
+osm/mapnik.xml
 db/
 logs/*
 lost+found
 www/nodeid.txt
-etc/*
+etc/README
 www/configuration

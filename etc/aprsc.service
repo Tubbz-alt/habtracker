@@ -1,0 +1,12 @@
+[Unit]
+Description=aprsc
+After=network.target auditd.service
+
+[Service]
+Type=forking
+ExecStart=/etc/init.d/aprsc start
+ExecReload=/etc/init.d/aprsc restart
+ExecStop=/etc/init.d/aprsc stop
+
+[Install]
+WantedBy=multi-user.target
