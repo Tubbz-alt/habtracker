@@ -167,9 +167,9 @@ include $documentroot . '/common/header.php';
 		    <tr><td class="packetlist" >backend daemon</td><td class="packetlistright" ><span id="habtracker-d-status"><mark style="background-color:  red;">Not okay</mark></span></td></tr>
                     </table>
                  </td>
-                 <td valign="top">
-                    <p class="normal-black" style="font-weight: bold; margin-top:  0px;">Start and Stop Processes:</p>
-		    <p class="normal-italic">Use these controls to start or stop the system daemons.</p>
+		 <td valign="top">
+		    <p> </p>
+                    <p> </p>
                     <p> </p>
                  </td></tr>
             </table> 
