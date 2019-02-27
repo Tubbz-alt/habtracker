@@ -55,8 +55,8 @@ apt-get -y install make cmake g++ libboost-dev libboost-system-dev libboost-file
 echo ""
 
 sleep 1
-echo "Installing OSM Renderer libraries and fonts..."
-apt-get -y install autoconf apache2-dev libtool libxml2-dev libbz2-dev libgeos-dev libgeos++-dev libproj-dev gdal-bin libmapnik-dev mapnik-utils python-mapnik
+echo "Installing OSM Renderer libraries, tools and fonts..."
+apt-get -y install autoconf apache2-dev libtool libxml2-dev libbz2-dev libgeos-dev libgeos++-dev libproj-dev gdal-bin libmapnik-dev mapnik-utils python-mapnik osmctools
 apt-get -y install fonts-noto-cjk fonts-noto-hinted fonts-noto-unhinted ttf-unifont
 echo ""
 

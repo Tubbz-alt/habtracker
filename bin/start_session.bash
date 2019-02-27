@@ -58,7 +58,7 @@ LOGDIR=${HOMEDIR}/logs
 HABTRACKERCMD=${BINDIR}/habtracker-daemon.py
 LOGFILE=${LOGDIR}/start_session.log
 STDERR=${LOGFILE}.stderr
-APRSRADIUS=800
+APRSRADIUS=400
 
 
 # Check if things are running:
