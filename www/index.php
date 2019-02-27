@@ -169,8 +169,8 @@ include $documentroot . '/common/header.php';
                  </td>
                  <td valign="top">
                     <p class="normal-black" style="font-weight: bold; margin-top:  0px;">Start and Stop Processes:</p>
-                    <p class="normal-italic">Use these controls to start or stop the system daemons.</p>
-/*                  <p class="normal-black"><button name="Start" id="startbutton" style="font-size: 1.1em;" onclick="startUpProcesses();">Start</button> &nbsp; <button name="Shutdown" id="stopbutton" style="font-size: 1.1em;" onclick="shutDownProcesses();">Stop</button></p>  */
+		    <p class="normal-italic">Use these controls to start or stop the system daemons.</p>
+                    <p> </p>
                  </td></tr>
             </table> 
             <p class="normal-italic" style="margin-left: 50px;"><strong>Note:</strong> Process status is updated automatically every 5secs.</p>
