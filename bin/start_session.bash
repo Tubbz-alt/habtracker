@@ -35,7 +35,7 @@
 #     In the future the mechanism for one's callsign will change for the better, but for now, it's just this one hardcoded 
 #     line in this script. ;)
 #
-CALLSIGN="E0SS"
+CALLSIGN="AE0SS"
 
 
 # This is the elevation at the predicted landing location.  This doesn't need to be exact. It represents the altitude floor
