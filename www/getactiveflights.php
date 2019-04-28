@@ -1,15 +1,35 @@
 <?php
+/*
+*
+##################################################
+#    This file is part of the HABTracker project for tracking high altitude balloons.
+#
+#    Copyright (C) 2019, Jeff Deaton (N6BA)
+#
+#    HABTracker is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    HABTracker is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with HABTracker.  If not, see <https://www.gnu.org/licenses/>.
+#
+##################################################
+*
+ */
+
     ###  This will query the database for the n most recent packets.  
 
     session_start();
     $documentroot = $_SERVER["DOCUMENT_ROOT"];
     include $documentroot . '/common/functions.php';
-    include $documentroot . '/common/sessionvariables.php';
-#    include '/var/www/aprs/common/database.php';
-#    $get_flightid="TEST-004";
-#    $get_callsign=""; 
-#    $lookbackperiod=180;
-   
+
+    $config = readconfiguration();
 
     if (isset($_GET["flightid"])) {
         $get_flightid = $_GET["flightid"];
@@ -27,11 +47,6 @@
         $get_callsign = "";
     }
 
-    #print_r($_SESSION);
-    #printf ("<br><br>");
-
-    #printf ("mycallsign:  %s,  lookbackperiod:  %s", $mycallsign, $lookbackperiod);
-    #printf ("<br><br>");
 
     ## Connect to the database
     $link = connect_to_database();
@@ -64,7 +79,6 @@
 
 /* ============================ */
 
-
     ## query the last packets from stations...
     $query = '
 select distinct 
@@ -72,7 +86,7 @@ select distinct
 date_trunc(\'milliseconds\', a.tm)::timestamp without time zone as thetime,
 case
     when a.ptype = \'/\' and a.raw similar to \'%[0-9]{6}h%\' then 
-        date_trunc(\'second\', ((to_timestamp(substring(a.raw from position(\'h\' in a.raw) - 6 for 6), \'HH24MISS\')::timestamp at time zone \'UTC\') at time zone \'America/Denver\')::time)::time without time zone
+        date_trunc(\'second\', ((to_timestamp(substring(a.raw from position(\'h\' in a.raw) - 6 for 6), \'HH24MISS\')::timestamp at time zone \'UTC\') at time zone $1)::time)::time without time zone
     else
         date_trunc(\'second\', a.tm)::time without time zone
 end as packet_time,
@@ -95,18 +109,15 @@ flights fl
 
 where 
 a.location2d != \'\' 
---and a.altitude > 0
-and a.tm > (now() - (to_char((\'' . $lookbackperiod . ' minute\')::interval, \'HH24:MI:SS\'))::time) 
-and fl.flightid = $1
+and a.tm > (now() - (to_char(($2)::interval, \'HH24:MI:SS\'))::time) 
+and fl.flightid = $3
 and fm.flightid = fl.flightid 
 and a.callsign = fm.callsign '
 . $get_callsign . 
 ' order by thetime asc, a.callsign ;'; 
 
-#printf ("<br><br>%s<br><br>", $query);
-#and a.tm < \'8-11-2018 10:18:00\' and a.tm > \'8-11-2018\' ' 
 
-    $result = pg_query_params($link, $query, array(sql_escape_string($get_flightid)));
+    $result = pg_query_params($link, $query, array(sql_escape_string($config["timezone"]), sql_escape_string($config["lookbackperiod"] . " minute"), sql_escape_string($get_flightid)));
     //$result = pg_query($link, $query);
     if (!$result) {
         db_error(sql_last_error());
@@ -164,14 +175,12 @@ and a.callsign = fm.callsign '
         else
             $verticalrate = 0;
 
-        /* If the altitude is 0, but the packet is differnet than the prior one, we're assuming the altitude number has been mangled.
+        /* If the altitude is 0, but the packet is different than the prior one, we're assuming the altitude number has been mangled.
            ...and therefore set it to the previous altitude value.  We do this because apparently the object is still moving, but its 
-           altitude value is oddball.  */
-        if ($altitude == 0 && $hash_prev[$callsign] != $hash)
-            $altitude = $altitude_prev[$callsign];
-
-        // print_r($row);
-        // printf ("alt:  [%s] %d\n", gettype($altitude), $altitude);
+           altitude value is oddball/screwy/messed-up.  */
+	if (array_key_exists($callsign, $hash_prev) && array_key_exists($callsign, $altitude_prev))
+            if ($altitude == 0 && $hash_prev[$callsign] != $hash)
+                $altitude = $altitude_prev[$callsign];
 
         $features[$callsign][$latitude . $longitude . $altitude] = array($latitude, $longitude, $altitude, $speed_mph, $bearing, $thetime, $verticalrate, $callsign, $packettime);
         $positioninfo[$callsign] = array($thetime, $symbol, $latitude, $longitude, $altitude, $comment, $speed_mph, $bearing, $verticalrate, $callsign, $packettime);
@@ -212,7 +221,7 @@ and a.callsign = fm.callsign '
     
             /* This prints out GeoJSON for the current location of the balloon/object */
             printf ("{ \"type\" : \"Feature\",");
-            printf ("\"properties\" : { \"id\" : %s, \"flightid\" : %s, \"callsign\" : %s, \"time\" : %s, \"packet_time\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : %s, \"tooltip\" : %s, \"objecttype\" : \"balloon\", \"speed\" : %s, \"bearing\" : %s, \"verticalrate\" : %s, \"label\" : %s },", 
+            printf ("\"properties\" : { \"id\" : %s, \"flightid\" : %s, \"callsign\" : %s, \"time\" : %s, \"packet_time\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : %s, \"tooltip\" : %s, \"objecttype\" : \"balloon\", \"speed\" : %s, \"bearing\" : %s, \"verticalrate\" : %s, \"label\" : %s, \"iconsize\" : %s },", 
             json_encode($callsign), 
             json_encode($get_flightid), 
             json_encode($callsign), 
@@ -226,7 +235,8 @@ and a.callsign = fm.callsign '
             json_encode($ray[6]), 
             json_encode($ray[7]), 
             json_encode($ray[8]),
-            json_encode($callsign . "<br>" . number_format($ray[4]) . "ft")
+	    json_encode($callsign . "<br>" . number_format($ray[4]) . "ft"),
+	    json_encode($config["iconsize"])
             );
 
             /* Print out the geometry object for this APRS object.  In this case, just the coordinates of the its current position */
@@ -281,14 +291,15 @@ and a.callsign = fm.callsign '
                 /* This is a GeoJSON object that will denote the peak altitude location we observed.  It's not the "exact" burst 
                    location for the balloon, but it's the highest altitude APRS beacon we've received for this callsign.
                    So, we print out a GeoJSON object at this lat/lon. */
-                printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"flightid\" : %s, \"callsign\" : %s, \"tooltip\" : %s, \"symbol\" : \"/n\", \"altitude\" : %s, \"comment\" : %s, \"objecttype\" : \"burstlocation\", \"label\" : %s },", 
+                printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"flightid\" : %s, \"callsign\" : %s, \"tooltip\" : %s, \"symbol\" : \"/n\", \"altitude\" : %s, \"comment\" : %s, \"objecttype\" : \"burstlocation\", \"label\" : %s, \"iconsize\" : %s },", 
                     json_encode($callsign . "_burst"), 
                     json_encode($get_flightid), 
                     json_encode($callsign . " Approximate Burst"), 
                     json_encode(number_format($peak_altitude) . "ft"), 
                     json_encode($peak_altitude), 
                     json_encode($get_flightid . " balloon burst"),
-                    json_encode(number_format($peak_altitude) . "ft")
+		    json_encode(number_format($peak_altitude) . "ft"),
+		    json_encode($config["iconsize"])
                 );
                 printf ("\"geometry\" : { \"type\" : \"Point\", \"coordinates\" : %s } }, ", json_encode(end($ascent_portion)));
 
@@ -348,7 +359,7 @@ and a.callsign = fm.callsign '
                         $altstring = number_format(ceil($alt / 1000)) .  "k ft";
  
                     /* This is for a GeoJSON object denoting the location of the breadcrumb */
-                    printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"time\" : %s, \"packet_time\" : %s, \"flightid\" : %s, \"callsign\" : %s, \"symbol\" : \"/J\", \"altitude\" : %s, \"comment\" : %s, \"objecttype\" : \"balloonmarker\", \"ascending\" : %s, \"speed\" : %s, \"heading\" : %s, \"verticalrate\" : %s },", 
+                    printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"time\" : %s, \"packet_time\" : %s, \"flightid\" : %s, \"callsign\" : %s, \"symbol\" : \"/J\", \"altitude\" : %s, \"comment\" : %s, \"objecttype\" : \"balloonmarker\", \"ascending\" : %s, \"speed\" : %s, \"heading\" : %s, \"verticalrate\" : %s, \"iconsize\" : %s },", 
                         json_encode($callsign . "_point_" . $i), 
                         json_encode($elem[5]), 
                         json_encode($elem[8]), 
@@ -359,7 +370,8 @@ and a.callsign = fm.callsign '
                         json_encode(($i < $peak_altitude_idx ? "true" : "false")), 
                         json_encode($elem[3]), 
                         json_encode($elem[4]), 
-                        json_encode($elem[6])
+			json_encode($elem[6]),
+			json_encode($config["iconsize"])
                         //($printlabel == true ? ", \"tooltip\" : " . json_encode($altstring) . ", \"label\" : " . json_encode($altstring) . "" : "")
                     );
 

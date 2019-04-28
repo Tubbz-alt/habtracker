@@ -28,6 +28,12 @@
 *
 */
 
+.leaflet-control-layers-group-name {
+    font-weight: 700;
+    text-decoration: underline;
+    margin-bottom: .2em;
+    margin-left: 3px;
+}
 
 .logo {
     font-size: 3em;
@@ -45,6 +51,17 @@
     text-align:  left;
     /*max-height:  300px;*/
     overflow: auto;
+}
+
+.altitudestyle {
+    color: black;
+    font-weight: bold;
+    background-color: yellow;
+}
+
+.commentstyle {
+    color: darkgreen;
+    font-style: italic;
 }
 
 
@@ -126,6 +143,15 @@ html, body, .map {
     color:  black;
     
 }
+
+a.normal-link {
+    color: blue;
+    text-decoration: none;
+    text-align:  left;
+    vertical-align: bottom;
+}
+a.normal-link:link { color:  blue; text-decoration:none; }
+a.normal-link:hover { color: red; text-decoration: underline; }
 
 
 p.instrumentvaluetitle {
@@ -214,6 +240,31 @@ div.lowerinstrumentpanel {
 }
 
 
+.trackerlist {
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-collapse:  collapse;
+    border:  solid 1px black;
+    margin-top:  3px;
+    margin-bottom:  3px;
+    padding-right:  5px;
+    padding-left:  5px;
+    font-size:  1em;
+    width:  auto;
+}
+
+.trackerlistheader {
+    color:  white;
+    text-decoration:none;
+    white-space: normal;
+    font-variant:  small-caps;
+    border:  solid 1px black;
+    background-color: #0074d9;
+    padding-right:  5px;
+    padding-left:  5px;
+    font-size:  1.2em;
+}
 
 .packetlist {
     text-align: left;
@@ -241,6 +292,7 @@ td.packetlistright {
     padding-left:  5px;
     font-size:  .9em;
 }
+
 
 
 

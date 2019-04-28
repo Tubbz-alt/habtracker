@@ -10,5 +10,8 @@ db/*
 logs/*
 lost+found
 www/nodeid.txt
-etc/README
-www/configuration
+etc/*
+www/configuration/config.txt
+www/gpsstatus.json*
+www/daemonstatus.json*
+bin/*.pyc

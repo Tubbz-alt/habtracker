@@ -1,12 +1,34 @@
 <?php
-    ###  This will query the database for the n most recent packets.  
+/*
+*
+##################################################
+#    This file is part of the HABTracker project for tracking high altitude balloons.
+#
+#    Copyright (C) 2019, Jeff Deaton (N6BA)
+#
+#    HABTracker is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    HABTracker is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with HABTracker.  If not, see <https://www.gnu.org/licenses/>.
+#
+##################################################
+*
+ */
+
 
     session_start();
     $documentroot = $_SERVER["DOCUMENT_ROOT"];
     include $documentroot . '/common/functions.php';
-    include $documentroot . '/common/sessionvariables.php';
 
-
+    $config = readconfiguration();
 
     function calc_speed($lat1, $lon1, $lat2, $lon2, $start, $end) {
         $p = pi()/180;
@@ -46,7 +68,27 @@
     }
     
     ## get the flights that we want to look at predictions for...
-    $query = 'select f.flightid, p.launchsite, max(p.thedate) as thedate from flights f, predictiondata p where p.flightid = f.flightid and f.active = \'t\' and f.flightid = $1 group by f.flightid, p.launchsite order by f.flightid;';
+    $query = 'select 
+        f.flightid, 
+        p.launchsite, 
+        max(p.thedate) as thedate 
+
+        from 
+        flights f, 
+        predictiondata p 
+       
+        where 
+        p.flightid = f.flightid 
+        and f.active = \'t\' 
+        and f.flightid = $1
+        and p.launchsite = f.launchsite
+        
+        group by 
+        f.flightid, 
+        p.launchsite 
+
+        order by 
+        f.flightid;';
     //$result = sql_query($query);
     $result = pg_query_params($link, $query, array(sql_escape_string($get_flightid)));
     if (!$result) {
@@ -61,7 +103,28 @@
     $numrows = 0;
     ## loop through each row of the prediction data for this specific flight, launchsite, and date combo...
     while ($row = sql_fetch_array($result)) {
-        $query2 = "select flightid, launchsite, thedate, thetime, altitude, latitude, longitude from predictiondata where flightid = $1 and launchsite = $2 and thedate = $3 order by flightid, launchsite, thedate, thetime asc;";
+        $query2 = "select 
+            flightid, 
+            launchsite, 
+            thedate, 
+            thetime, 
+            altitude, 
+            latitude, 
+            longitude 
+
+            from 
+            predictiondata 
+
+            where 
+            flightid = $1 
+            and launchsite = $2 
+            and thedate = $3 
+
+            order by 
+            flightid, 
+            launchsite, 
+            thedate, 
+            thetime asc;";
         $result2 = pg_query_params($link, $query2, array(sql_escape_string($row['flightid']), sql_escape_string($row['launchsite']), sql_escape_string($row['thedate'])));
         if (!$result2) {
             db_error(sql_last_error());
@@ -111,7 +174,13 @@
         $firsttimeinloop = 0;
         //printf ("{ \"type\" : \"FeatureCollection\", \"features\" : [ { \"type\" : \"Feature\",\n");
         printf ("{ \"type\" : \"Feature\",\n");
-        printf ("\"properties\" : { \"id\" : %s, \"callsign\" : %s, \"symbol\" : %s, \"comment\" : %s, \"objecttype\" : \"flightprediction\" },", json_encode($flightid . "_prediction"), json_encode($flightid), json_encode($positioninfo[$flightid][1]), json_encode($positioninfo[$flightid][5])) ;
+	printf ("\"properties\" : { \"id\" : %s, \"callsign\" : %s, \"symbol\" : %s, \"comment\" : %s, \"objecttype\" : \"flightprediction\", \"iconsize\" : %s },", 
+		json_encode($flightid . "_prediction"), 
+		json_encode($flightid), 
+		json_encode($positioninfo[$flightid][1]), 
+		json_encode($positioninfo[$flightid][5]),
+		json_encode($config["iconsize"])
+	);
         printf ("\"geometry\" : { \"type\" : \"Point\", \"coordinates\" : [%s, %s]}", $positioninfo[$flightid][3], $positioninfo[$flightid][2]);
         printf ("}");
         if (count($ray) > 1) {
@@ -138,12 +207,13 @@
                 //printf ("<br><br>");
                 printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"ascending\" : \"true\", \"objecttype\" : \"flightpredictionpath\" },", json_encode($flightid . "_ascent_path_prediction"));
                 printf ("\"geometry\" : { \"type\" : \"LineString\", \"coordinates\" : %s }  }, ", json_encode($ascent_portion));
-                printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"callsign\" : %s, \"tooltip\" : %s,  \"symbol\" : \"/n\", \"altitude\" : %s, \"comment\" : \"Predicted burst\", \"objecttype\" : \"burstlocation\", \"label\" : %s },", 
+                printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"callsign\" : %s, \"tooltip\" : %s,  \"symbol\" : \"/n\", \"altitude\" : %s, \"comment\" : \"Predicted burst\", \"objecttype\" : \"burstlocation\", \"label\" : %s, \"iconsize\" : %s },", 
                     json_encode($flightid . "_burst_predicted"), 
                     json_encode($flightid . " Predicted Burst"), 
                     json_encode(number_format($peak_altitude) . "ft"), 
                     json_encode($peak_altitude),
-                    json_encode(number_format($peak_altitude) . "ft")
+		    json_encode(number_format($peak_altitude) . "ft"),
+		    json_encode($config["iconsize"])
                 );
                 printf ("\"geometry\" : { \"type\" : \"Point\", \"coordinates\" : %s } }, ", json_encode(end($ascent_portion)));
                 printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"ascending\" : \"false\", \"objecttype\" : \"flightpredictionpath\" },", json_encode($flightid . "_descent_path_prediction"));
@@ -181,7 +251,7 @@
                         if ($i > 0)
                             printf (", ");
                     /* This is the GeoJSON object for the breadcrumb within the predicted flight path */ 
-                        printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"callsign\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : \"Flight prediction\", \"objecttype\" : \"balloonmarker\", \"time\" : %s, \"tooltip\" : %s, \"label\" : %s },", 
+                        printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"callsign\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : \"Flight prediction\", \"objecttype\" : \"balloonmarker\", \"time\" : %s, \"tooltip\" : %s, \"label\" : %s, \"iconsize\" : %s },", 
                         //printf ("{ \"type\" : \"Feature\", \"properties\" : { \"id\" : %s, \"callsign\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : \"Flight prediction\", \"objecttype\" : \"balloonmarker\", \"time\" : %s },", 
                             json_encode($flightid . "_predictionpoint_" . $i), 
                             json_encode($flightid), 
@@ -189,7 +259,8 @@
                             json_encode($element[2]), 
                             json_encode($elem[3]),
                             json_encode(number_format(($element[2] < 10000 ? floor($element[2] / 1000) : 10 * floor($element[2] / 10000))) . "k ft"), 
-                            json_encode(number_format(($element[2] < 10000 ? floor($element[2] / 1000) : 10 * floor($element[2] / 10000))) . "k ft") 
+			    json_encode(number_format(($element[2] < 10000 ? floor($element[2] / 1000) : 10 * floor($element[2] / 10000))) . "k ft"),
+			    json_encode($config["iconsize"])
                             //json_encode(number_format($element[2]) . "ft"),
                             //json_encode(number_format($element[2]) . "ft")
                         );

@@ -1,3 +1,28 @@
+<?php
+/*
+*
+##################################################
+#    This file is part of the HABTracker project for tracking high altitude balloons.
+#
+#    Copyright (C) 2019, Jeff Deaton (N6BA)
+#
+#    HABTracker is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    HABTracker is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with HABTracker.  If not, see <https://www.gnu.org/licenses/>.
+#
+##################################################
+*
+ */
+?>
 <!DOCTYPE html>
 <html>
 <head>
@@ -26,6 +51,7 @@ else
 <link href="/common/leaflet.groupedlayercontrol.min.css" rel="stylesheet">
 <link href="/common/leaflet-sidebar.css" rel="stylesheet">
 <link href="/common/flightindicators.css" rel="stylesheet">
+<link href="/common/Control.SimpleMarkers.css" rel="stylesheet">
 <link href="/common/mapstyles.css" rel="stylesheet">
 
 <!-- Load js -->
@@ -34,10 +60,11 @@ else
 <script src="/leaflet/leaflet.js"></script>
 <script src="/common/jquery-3.3.1.js"></script>
 <script src="/common/leaflet-realtime.min.js"></script>
-<script src="/common/symbols.js"></script>
+<script src="/common/symbols-map.js"></script>
 <script src="/common/leaflet.groupedlayercontrol.min.js"></script>
 <script src="/common/leaflet-sidebar.js"></script>
 <script src="/common/jquery.flightindicators.js"></script>
+<script src="/common/Control.SimpleMarkers.js"></script>
 
 </head>
 <body>

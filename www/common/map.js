@@ -170,8 +170,8 @@
 			html = "<strong>" + feature.properties.callsign + "</strong>";
 
                     // Update the popup content to include a number of balloon specific items
-       		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br>" + feature.properties.comment : "")) + 
-		        (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <mark>" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+       		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br><font class=\"commentstyle\">" + feature.properties.comment + "</font>" : "")) + 
+		        (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 		        (typeof(feature.properties.frequency) == "undefined" ? "" : (feature.properties.frequency != "" ? "<br>Heard on: " + feature.properties.frequency + "MHz" : "" )) +
 		        (typeof(feature.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (feature.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (feature.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 		        (typeof(feature.properties.time) == "undefined" ? "" : (feature.properties.time != "" ? "<br>Time: " + feature.properties.time : ""));
@@ -183,6 +183,7 @@
                     var mappane;
                     var tipclass;
                     var offset;
+		    var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
 
                     if (objecttype == "balloon") {
                         mappane = "flightTooltipPane";
@@ -256,6 +257,7 @@
 
                // ...for everything else, we create the standard APRS icon for this object based on it's advertised "symbol"
                else {
+                   var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
                    var localiconsize = iconsize;
                    var mappane = "otherStationsPane";
 
@@ -314,8 +316,8 @@
                 html = "<strong>" + item.properties.callsign + "</strong>";
 
             // Update the popup content to include a number of balloon specific items
-            html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br>" + item.properties.comment : "")) + 
-                (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <mark>" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+            html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br><font class=\"commentstyle\">" + item.properties.comment + "</font>" : "")) + 
+                (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
                 (typeof(item.properties.frequency) == "undefined" ? "" : (item.properties.frequency != "" ? "<br>Heard on: " + item.properties.frequency + "MHz" : "" )) +
 	  	      (typeof(item.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (item.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (item.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
                 (typeof(item.properties.time) == "undefined" ? "" : (item.properties.time != "" ? "<br>Time: " + item.properties.time : ""));
@@ -355,10 +357,10 @@
             
             // dispatch an event with this feature as content so that event listeners can update their content
             // dispatch event code here...
-            if (item.properties.objecttype == "balloon") {
-                var flightEvent = new CustomEvent("UpdateFlightGauges", { detail: item });
-                document.dispatchEvent(flightEvent);
-            }
+            //if (item.properties.objecttype == "balloon") {
+            //    var flightEvent = new CustomEvent("UpdateFlightGauges", { detail: item });
+            //    document.dispatchEvent(flightEvent);
+           // }
 
         }
         //document.getElementById("error").innerHTML = JSON.stringify(flightids);
@@ -410,14 +412,16 @@
 
 
 		    html = "<strong>" + feature.properties.callsign + "</strong>";
-		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br>" + feature.properties.comment : "")) + 
-			      (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <mark>" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br><font class=\"commentstyle\">" + feature.properties.comment + "</font>" : "")) + 
+			      (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 			      (typeof(feature.properties.frequency) == "undefined" ? "" : (feature.properties.frequency != "" ? "<br>Heard on: " + feature.properties.frequency + "MHz" : "" )) +
 			      (typeof(feature.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (feature.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (feature.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 			      (typeof(feature.properties.time) == "undefined" ? "" : (feature.properties.time != "" ? "<br>Time: " + feature.properties.time : ""));
 
 		    layer.bindPopup(html, {className:  'myPopupStyle'} );
 
+
+                    var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
 
                     // if this object has a tooltip or label defined...
                     if (feature.properties.tooltip) {
@@ -436,7 +440,7 @@
            pointToLayer:  function (feature, latlon) {
                var filename;
                var id = feature.properties.id;
-               var localiconsize = iconsize;
+               var localiconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
                var markercolor = 'navy';
 
                // Determine what the APRS symbol is for this object, then determine path to the corresponding icon file.
@@ -480,8 +484,8 @@
             var html = "";
 
             html = "<strong>" + item.properties.callsign + "</strong>";
-	    html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br>" + item.properties.comment : "")) + 
-		      (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <mark>" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+	    html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br><font class=\"commentstyle\">" + item.properties.comment + "</font>" : "")) + 
+		      (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 		      (typeof(item.properties.frequency) == "undefined" ? "" : (item.properties.frequency != "" ? "<br>Heard on: " + item.properties.frequency + "MHz" : "" )) +
 	  	      (typeof(item.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (item.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (item.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 		      (typeof(item.properties.time) == "undefined" ? "" : (item.properties.time != "" ? "<br>Time: " + item.properties.time : ""));
@@ -547,13 +551,15 @@
                 if (objecttype == "landingprediction") {
                     var id = feature.properties.id;
 		    html = "<strong>" + feature.properties.callsign + "</strong>";
-		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br>" + feature.properties.comment : "")) + 
-			      (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <mark>" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br><font class=\"commentstyle\">" + feature.properties.comment + "</font>" : "")) + 
+			      (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 			      (typeof(feature.properties.frequency) == "undefined" ? "" : (feature.properties.frequency != "" ? "<br>Heard on: " + feature.properties.frequency + "MHz" : "" )) +
 			      (typeof(feature.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (feature.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (feature.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 			      (typeof(feature.properties.time) == "undefined" ? "" : (feature.properties.time != "" ? "<br>Time: " + feature.properties.time : ""));
                     // Popup for the landing prediction point
 		    layer.bindPopup(html, {className:  'myPopupStyle'} );
+
+                    var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
 
                     // if this object has a tooltip or label defined...
                     if (feature.properties.tooltip) {
@@ -577,6 +583,7 @@
                else 
                    filename = "/images/aprs/" + feature.properties.symbol.charAt(0) + "-" + symbols["\\" + feature.properties.symbol.charAt(1)].tocall + ".png";
 
+               var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
                var localiconsize = iconsize;
 
                if (feature.properties.symbol) 
@@ -611,8 +618,8 @@
             var html = "";
 
             html = "<strong>" + item.properties.callsign + "</strong>";
-	    html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br>" + item.properties.comment : "")) + 
-		      (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <mark>" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+	    html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br><font class=\"commentstyle\">" + item.properties.comment + "</font>" : "")) + 
+		      (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 		      (typeof(item.properties.frequency) == "undefined" ? "" : (item.properties.frequency != "" ? "<br>Heard on: " + item.properties.frequency + "MHz" : "" )) +
 	  	      (typeof(item.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (item.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (item.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 		      (typeof(item.properties.time) == "undefined" ? "" : (item.properties.time != "" ? "<br>Time: " + item.properties.time : ""));
@@ -662,14 +669,16 @@
 			      "&zoom=" + mapzoom + 
 			      "&showallstations=1\">" + 
 			      "<strong>" + feature.properties.callsign + "</strong></a>";
-		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br>" + feature.properties.comment : "")) + 
-			      (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <mark>" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+		    html = html + (typeof(feature.properties.comment) == "undefined" ? "" : (feature.properties.comment != "" ? "<br><font class=\"commentstyle\">" + feature.properties.comment + "</font>" : "")) + 
+			      (typeof(feature.properties.altitude) == "undefined" ? "" : (feature.properties.altitude != 0 && feature.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (feature.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 			      (typeof(feature.properties.frequency) == "undefined" ? "" : (feature.properties.frequency != "" ? "<br>Heard on: " + feature.properties.frequency + "MHz" : "" )) +
 			      (typeof(feature.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (feature.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (feature.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 			      (typeof(feature.properties.time) == "undefined" ? "" : (feature.properties.time != "" ? "<br>Time: " + feature.properties.time : ""));
 
 
 		    layer.bindPopup(html, {className:  'myPopupStyle'} );
+
+                    var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
 
                     // if this object has a tooltip or label defined...
                     if (feature.properties.tooltip) {
@@ -693,6 +702,7 @@
                else 
                    filename = "/images/aprs/" + feature.properties.symbol.charAt(0) + "-" + symbols["\\" + feature.properties.symbol.charAt(1)].tocall + ".png";
 
+               var iconsize = (typeof(feature.properties.iconsize) == undefined ? 24 : feature.properties.iconsize * 10 / 10); 
                var localiconsize = iconsize;
 
                    if (feature.properties.symbol) 
@@ -735,8 +745,8 @@
 		      "&showallstations=1\">" + 
                       "<strong>" + item.properties.callsign + "</strong></a>";
 
-	    html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br>" + item.properties.comment : "")) + 
-		      (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <mark>" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</mark>" : "")) + 
+	    html = html + (typeof(item.properties.comment) == "undefined" ? "" : (item.properties.comment != "" ? "<br><font class=\"commentstyle\">" + item.properties.comment + "</font>" : "")) + 
+		      (typeof(item.properties.altitude) == "undefined" ? "" : (item.properties.altitude != 0 && item.properties.altitude != "" ? "<br>Altitude: <font class=\"altitudestyle\">" + (item.properties.altitude * 10 / 10).toLocaleString() + "ft</font>" : "")) + 
 		      (typeof(item.properties.frequency) == "undefined" ? "" : (item.properties.frequency != "" ? "<br>Heard on: " + item.properties.frequency + "MHz" : "" )) +
 	  	      (typeof(item.geometry.coordinates) == "undefined" ? "" : "<br>Coords: " + (item.geometry.coordinates[1] * 10 / 10).toFixed(3) + ", " + (item.geometry.coordinates[0] * 10 / 10).toFixed(3)) +
 		      (typeof(item.properties.time) == "undefined" ? "" : (item.properties.time != "" ? "<br>Time: " + item.properties.time : ""));

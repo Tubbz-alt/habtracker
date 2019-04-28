@@ -34,14 +34,13 @@ import os
 import math
 import osmosdr
 import time
-import datetime 
+import datetime
 import psycopg2 as pg
 import aprslib
 import logging
 import usb.core
 import usb.util
 from gps import *
-import time
 import threading as th
 import sys
 import numpy as np
@@ -51,9 +50,12 @@ from scipy.interpolate import *
 from scipy.optimize import *
 import signal
 import psutil
+import json
+import random
 
 #import local configuration items
-import habconfig 
+import habconfig
+import landingpredictor as lp
 
 
 class GracefulExit(Exception):
@@ -82,15 +84,14 @@ class aprs_receiver(gr.top_block):
         ##################################################
         # Variables
         ##################################################
-        self.mtusize = 9000 
+        self.mtusize = 9000
         self.samp_rate = self.direwolf_audio_rate * 42
         self.transition_width = 1000
-        self.lowpass_freq = 5000
+        self.lowpass_freq = 5500
         self.decimation = self.samp_rate / (self.direwolf_audio_rate)
-        #self.scale = 32767
-        self.scale = 10240
+        self.scale = 14336
         self.quadrate = self.samp_rate / self.decimation
-        self.max_deviation = 2500
+        self.max_deviation = 3300
         self.lowpass_filter_0 = firdes.low_pass(20, self.samp_rate, self.lowpass_freq, self.transition_width, firdes.WIN_HANN, 6.76)
         self.center_freq = 145000000
 
@@ -109,7 +110,7 @@ class aprs_receiver(gr.top_block):
         self.osmosdr_source_0.set_bb_gain(20, 0)
         self.osmosdr_source_0.set_antenna('', 0)
         self.osmosdr_source_0.set_bandwidth(0, 0)
- 
+
         for freq,port in self.Frequencies:
             #print "   channel:  [%d] %dMHz" % (port, freq)
             #print "   quadrate:  %d" % (self.quadrate)
@@ -135,13 +136,13 @@ class aprs_receiver(gr.top_block):
 
 ##################################################
 # GRProcess:
-#    - Then starts up an instance of the aprs_receiver class 
+#    - Then starts up an instance of the aprs_receiver class
 ##################################################
 def GRProcess(flist=[(144390000, 12000)], rtl=0, e = None):
     try:
-  
+
         #print "GR [%d], listening on: " % rtl, flist
- 
+
         # create an instance of the aprs receiver class
         tb = aprs_receiver(freqlist=flist, rtl=rtl)
 
@@ -152,7 +153,7 @@ def GRProcess(flist=[(144390000, 12000)], rtl=0, e = None):
         tb.stop()
         print "GnuRadio ended"
 
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (GracefulExit, KeyboardInterrupt, SystemExit):
         tb.stop()
         print "GnuRadio ended"
 
@@ -163,8 +164,10 @@ def GRProcess(flist=[(144390000, 12000)], rtl=0, e = None):
 ##################################################
 def GpsPoller(e):
     gpsconn = None
-    try: 
-        gpsd = gps(mode=WATCH_ENABLE) 
+    GPSStatusFile = "/eosstracker/www/gpsstatus.json"
+    GPSStatusTempFile = "/eosstracker/www/gpsstatus.json.tmp"
+    try:
+        gpsd = gps(mode=WATCH_ENABLE)
         gpsconn = pg.connect (habconfig.dbConnectionString)
         gpscur = gpsconn.cursor()
         timeprev = datetime.datetime.now()
@@ -172,564 +175,66 @@ def GpsPoller(e):
         prevlon = 0
         #while True:
         while not e.is_set():
-            report = gpsd.next() 
+            report = gpsd.next()
             thetime = datetime.datetime.now()
             timedelta = thetime - timeprev
-            if timedelta.total_seconds() > 1.5 and (round(gpsd.fix.latitude,4) != prevlat or round(gpsd.fix.longitude,4) != prevlon):
-                sql = """insert into 
-                    gpsposition values (
-                        (%s::timestamp at time zone 'UTC')::timestamp with time zone at time zone 'America/Denver', 
-                        %s::numeric, 
-                        %s::numeric, 
-                        %s::numeric, 
-                        ST_GeometryFromText('POINT(%s %s)', 4326), 
-                        ST_GeometryFromText('POINTZ(%s %s %s)', 4326)
-                    );"""
-                if gpsd.fix.latitude != 0 and gpsd.fix.longitude != 0 and gpsd.fix.altitude >= 0:
-                    gpscur.execute(sql, [
-                        gpsd.utc, 
-                        round(gpsd.fix.speed * 2.236936, 0), 
-                        gpsd.fix.track, 
-                        round(gpsd.fix.altitude * 3.2808399, 0), 
-                        gpsd.fix.longitude, 
-                        gpsd.fix.latitude, 
-                        gpsd.fix.longitude, 
-                        gpsd.fix.latitude, 
-                        gpsd.fix.altitude 
-                    ])
-                    gpsconn.commit()
-                    timeprev = thetime
-                prevlat = round(gpsd.fix.latitude,4) 
-                prevlon = round(gpsd.fix.longitude,4) 
+            if timedelta.total_seconds() > 1.5:
+                if round(gpsd.fix.latitude,4) != prevlat or round(gpsd.fix.longitude,4) != prevlon:
+                    sql = """insert into
+                        gpsposition values (
+                            (%s::timestamp at time zone 'UTC')::timestamp with time zone at time zone 'America/Denver',
+                            %s::numeric,
+                            %s::numeric,
+                            %s::numeric,
+                            ST_GeometryFromText('POINT(%s %s)', 4326),
+                            ST_GeometryFromText('POINTZ(%s %s %s)', 4326)
+                        );"""
+                    if gpsd.fix.latitude != 0 and gpsd.fix.longitude != 0 and gpsd.fix.altitude >= 0:
+                        gpscur.execute(sql, [
+                            gpsd.utc,
+                            round(gpsd.fix.speed * 2.236936, 0),
+                            gpsd.fix.track,
+                            round(gpsd.fix.altitude * 3.2808399, 0),
+                            gpsd.fix.longitude,
+                            gpsd.fix.latitude,
+                            gpsd.fix.longitude,
+                            gpsd.fix.latitude,
+                            gpsd.fix.altitude
+                        ])
+                        gpsconn.commit()
+                        timeprev = thetime
+                    prevlat = round(gpsd.fix.latitude,4)
+                    prevlon = round(gpsd.fix.longitude,4)
+
+                ## Need to change this in the future to putting detailed status within the database instead of a text JSON file.  ;)
+                mysats = []
+                mysats_sorted = []
+                mymode = ""
+                with open(GPSStatusTempFile, "w") as f:
+                    for sat in gpsd.satellites:
+                        mysats.append({ "prn": str(sat.PRN), "elevation" : str(sat.elevation), "azimuth" : str(sat.azimuth), "snr" : str(sat.ss), "used" : str(sat.used) })
+                    if len(gpsd.satellites) > 0:
+                        mysats_sorted = sorted(mysats, key=lambda k: k['used'], reverse=True)
+                    gpsstats = { "utc_time" : str(gpsd.utc), "mode" : str(gpsd.fix.mode), "status" : str(gpsd.status), "lat" : str(round(gpsd.fix.latitude, 6)), "lon" : str(round(gpsd.fix.longitude, 6)), "satellites" : mysats_sorted, "speed_mph" : str(round(gpsd.fix.speed * 2.236936, 0)), "altitude" : str(round(gpsd.fix.altitude * 3.2808399, 0)) }
+                    f.write(json.dumps(gpsstats))
+                if os.path.isfile(GPSStatusTempFile):
+                    os.rename(GPSStatusTempFile, GPSStatusFile)
         print "Shutting down GPS Loop..."
+        with open(GPSStatusTempFile, "w") as f:
+            gpsstats = { "utc_time" : "n/a", "mode" : 0, "status" : 0, "lat" : "n/a", "lon" : "n/a", "satellites" : [], "speed_mph" : 0, "altitude" : 0 }
+            f.write(json.dumps(gpsstats))
+        if os.path.isfile(GPSStatusTempFile):
+            os.rename(GPSStatusTempFile, GPSStatusFile)
         gpsconn.close()
     except pg.DatabaseError as error:
         print(error)
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
-        gpsconn.close() 
+    except (GracefulExit, KeyboardInterrupt, SystemExit):
+        gpsconn.close()
         print "GPS poller ended"
     finally:
+
         if gpsconn is not None:
             gpsconn.close()
-
-
-
-
-#####################################
-# Function to use to determine distance between two points
-#####################################
-#def distance(lat1, lon1, lat2, lon2):
-#    p = 0.017453292519943295     #Pi/180
-#    a = 0.5 - cos((lat2 - lat1) * p)/2 + cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2
-#    return 12742 * asin(sqrt(a)) #2*R*asin...
-    
-# This is the initial floor for the algorithm.  Prediction calculations are no longer performed for altitudes below this value.
-# This will automatically adjust later on...to the elevation of the originating launch site for the given flight
-floor = 4900
-
-# This is the velocity value in ft/s at the floor.  That is, how fast is the balloon traveling when it hits ground level.  Or put 
-# more mathmatically kindof our x-intercept.
-adjust = 17
-#####################################
-# Functions to use for curve fitting
-#####################################
-def func_x2(x, a) :
-    global floor
-    global adjust
-    return a * np.power(x - floor, 2) + adjust
-
-
-def func_fittedline(x, a, b):
-    # this is y = mx +b
-    return a*x + b
-    
-        
-#####################################
-# Primary landing prediction function
-#####################################
-def landingPredictor(altitude_floor):
-    global floor
-    global adjust
-    try:
-        floor = altitude_floor
-        
-        # Database connection 
-        landingconn = None
-        landingconn = pg.connect (habconfig.dbConnectionString)
-        landingcur = landingconn.cursor()
-        
-        # SQL for getting active flights and callsigns
-        flightids_sql = """
-            select distinct 
-            f.flightid, 
-            fm.callsign,
-            l.launchsite,
-            l.lat,
-            l.lon,
-            l.alt
-
-            from 
-            flights f, 
-            flightmap fm,
-            launchsites l
-
-            where 
-            fm.flightid = f.flightid 
-            and l.launchsite = f.launchsite
-            and f.active = 't' 
-
-            order by 
-            f.flightid, 
-            fm.callsign;"""
-        
-        # Execute the query and get the list of flightids
-        landingcur.execute(flightids_sql)
-        rows = landingcur.fetchall()
-        flightids = np.array(rows)
-        
-        descent_arrays = []
-        ### Now...
-        #   1.  Loop through each callsign,  flightid (from above)
-        #   2.  Query the database to get all recent packets for those callsigns that makeup this flight
-        #   3.  Create a curve fitting for the incoming packets
-        #   4.  Loop through the prediction data for this flightid, adding up all of the lat/long deltas to get a predicted landing location
-        #   5.  Insert the predicted landing location into the database. 
-        
-        i = 0
-        while (i < len(flightids)):
-        #for fid, callsign in flightids:
-            # this is the flightid name
-            fid = flightids[i,0]
-            callsign = flightids[i,1]
-
-            # set the floor for predictions to the elevation of the launch site
-            floor = float(flightids[i,5])
-            #print "Setting algorithm floor to: %.2f ft for %s:%s" % (floor, fid, callsign)
-
-            #print "fid: %s, callsign: %s" %(fid, callsign)
-            #print "fid = %s, str: %s,  type: %s" %(fid, fid[0], type(fid))
-        
-            # The SQL statement to get the latest packets for this flightid
-            # This data is used for two purposes:  
-            #    1) to get the ascent data for this flight which is used for prediction purposes
-            #    2) and for getting the current packets when the balloon is descending so we can use that as the starting point for curve fitting 
-            #
-        #                           --date_trunc('second', a.tm)::timestamp without time zone as thetime,
-            # columns:  timestamp, altitude, latitude, longitude
-            latestpackets_sql = """select distinct 
-                                   --date_trunc('second', a.tm)::timestamp without time zone as thetime,
-                                   case
-                                       when a.ptype = '/' and a.raw similar to '%%[0-9]{6}h%%' then 
-                                           date_trunc('second', ((to_timestamp(now()::date || ' ' || substring(a.raw from position('h' in a.raw) - 6 for 6), 'YYYY-MM-DD HH24MISS')::timestamp at time zone 'UTC') at time zone 'America/Denver')::timestamp)::timestamp without time zone
-                                       else
-                                           date_trunc('second', a.tm)::timestamp without time zone
-                                   end as thetime,
-                                   a.altitude,
-                                   ST_Y(a.location2d) as lat,
-                                   ST_X(a.location2d) as long
-        
-                                   from 
-                                   packets a
-        
-                                   where 
-                                   ST_X(a.location2d) != 0 
-                                   and ST_Y(a.location2d) != 0 
-                                   and a.altitude > %s
-                                   and a.callsign = %s
-                                   and a.tm > now()::date
-        
-                                   order by 
-                                   thetime asc,
-                                   a.altitude
-                                   ; """
-          
-            # Execute the SQL statment and get all rows returned
-            landingcur.execute(latestpackets_sql, [ floor, callsign ])
-            rows = landingcur.fetchall()
-        
-            if len(rows) > 1:
-                #print "fid: %s, callsign: %s, number of rows:  %g" %(fid, callsign, len(rows))
-                ##  balloon_data contains a list of all rows (i.e. packets) received for this callsign thus far
-                ##  columns:  timestamp, altitude, latitude, longitude
-                # balloon_data = np.array(rows, dtype='f')
-                balloon_data = np.array(rows)
-                alt_prev = 0
-                lat_prev = 0
-                long_prev = 0
-                alt_rate = 0
-                lat_rate = 0
-                lon_rate = 0
-        
-                current_packets = []
-                first_packet = []
-                firsttime = 0
-                for row in rows:
-                    thetime = row[0]
-                    if firsttime == 0:
-                        time_delta = thetime
-                        firsttime = 1
-                        first_packet = row
-                    else:
-                        time_delta = thetime - time_prev
-                        if time_delta.total_seconds() > 0:
-                            alt_rate = float(row[1] - alt_prev) / float(time_delta.total_seconds())
-                            lat_rate = float(row[2] - lat_prev) / float(time_delta.total_seconds())
-                            lon_rate = float(row[3] - lon_prev) / float(time_delta.total_seconds())
-                            #alt_rate = float(alt_prev - row[1]) / float(time_delta.total_seconds())
-                            #lat_rate = float(lat_rate - row[2]) / float(time_delta.total_seconds())
-                            #lon_rate = float(lon_rate - row[3]) / float(time_delta.total_seconds())
-                            current_packets.append([row[1], row[2], row[3],  alt_rate, lat_rate, lon_rate])
-                    time_prev = row[0]
-                    alt_prev = row[1]
-                    lat_prev = row[2]
-                    lon_prev = row[3]
-                d = np.array(current_packets)
-                #print "len(d):  %d" % len(d)
-        
-                # list of just the altitude columns
-                altitudes = d[0:, 0]
-        
-                # find the maximum altitude and note the index position of that value
-                idx = np.argmax(altitudes)
-                max_altitude = altitudes[idx]
-               
-                # slice off the ascending portion of the flight using the index just determined
-                ascent_rates = d[0:(idx+1),0:]
-                ascent_rates_pristine = d[0:(idx+1),0:]
-        
-                # Need to find out if this flight is descending yet...
-                # 1.  find max altitude
-                # 2.  split array into ascending and descending portions
-                # 3.  measure length of the two arrays (i.e. ascending and descending)  
-                # 4.  if the descending portion is less than 1 in length, then nope, balloon is not descending yet.
-                # This slices off just the altitude column
-                #  reminder, balloon_data columns:  timestamp, altitude, latitude, longitude
-                altitude_slice = balloon_data[0:, 1]
-                
-                # Determine the maximum altitude and the index of that value
-                idx = np.argmax(altitude_slice)
-         
-                # split the balloon_data list into two portions based on the index just discovered
-                ascent_portion = balloon_data[0:(idx+1), 0:]
-                descent_portion = balloon_data[(idx+1):, 0:]
-        
-                np.set_printoptions(threshold=np.nan)
-        
-                #####
-                # Now we need to determine if we're missing values at the beginning of this flight because of radio limitations, noise, whatever.
-                # ...if that's the case, then we append the "missing values" to the end of this array by using the predicted flight path data.
-                # Get a list of the prediction values from the predicted flight path.
-                predictiondata_sql = """select 
-                    p.altitude, 
-                    p.latitude, 
-                    p.longitude, 
-                    p.altrate, 
-                    p.latrate, 
-                    p.longrate 
-                    
-                    from predictiondata p inner join  
-                        (select 
-                            f.flightid, 
-                            p.launchsite, 
-                            max(p.thedate) as thedate 
-                            
-                            from 
-                            flights f, 
-                            predictiondata p 
-    
-                            where 
-                            p.flightid = f.flightid 
-                            and f.active='t' 
-    
-                            group by 
-                            f.flightid, 
-                            p.launchsite 
-    
-                            order by 
-                            f.flightid
-                        ) as a on p.flightid = a.flightid and p.launchsite = a.launchsite and p.thedate = a.thedate 
-       
-                    where 
-                    p.flightid = %s 
-                    and p.thedate = a.thedate
-    
-                    order by 
-                    p.thedate, 
-                    p.thetime asc
-                ;"""
-        
-                # Columns:   altitude, latitude, longitude, altitude_rate, latitude_rate, longitude_rate
-                # Execute the SQL statement
-                landingcur.execute(predictiondata_sql, [ fid ])
-         
-                # stuff all returned rows into an array
-                rows = landingcur.fetchall()
-
-                # We only want to slice/append/concatenate in data from prediction data IF there is actually prediction data...duh..
-                if len(rows) > 2:
-
-                    # reverse the ascent rate list so that the maximum value is first....i.e. so it "looks like" a descending list of altitudes
-                    # ascent_rates:  this array contains wind vector values that this callsign experienced during the ascent portion of its flight.
-                    # columns: altitude, latitude, longitude, elevation change rate , latitude change rate, longitude change rate
-                    # change rates are in ft/s and decimal degrees per sec.
-                    #
-                    # this array is reversed here because we'll use it below to get wind vector data for the prediction
-                    ascent_rates = ascent_rates[::-1]       
-        
-                    # Convert that array to a Numpy array
-                    predictiondata = np.array(rows, dtype='f')
-            
-                    # find the maximum altitude and note the index position of that value
-                    idx = np.argmax(predictiondata[0:,0])
-        
-                    # slice off the ascending portion of the flight using the index just determined, and reverse the array
-                    prediction_ascent_portion = predictiondata[0:(idx+1),0:]
-                    prediction_altitudes = prediction_ascent_portion[0:,0]
-                    prediction_altitudes = prediction_altitudes[::-1]
-         
-                    # Determine the index of the altitude within the prediction data that is closest to the smallest value from the received ascent data.
-                    # ...aka, the value of where our heard ascent packets started
-                    lowest_heard_altitude = ascent_rates[-1:, 0]
-                    #print prediction_altitudes
-                
-                    idx = 0
-                    for alt in prediction_altitudes:
-                        #print "alt:  %g, lowest_heard_altitude:  %g" % (alt, lowest_heard_altitude)
-                        if alt < lowest_heard_altitude:
-                            break 
-                        idx += 1
-        
-                    # slice off the missing values and append them to our ascent_rates array, and reverse the array back to normal order
-                    newidx = prediction_ascent_portion.shape[0] - (idx + 1)
-                    preddata_portion = prediction_ascent_portion[0:newidx,0:]
-                    preddata_portion = preddata_portion[::-1]
-            
-                    ascent_rates = np.concatenate((ascent_rates, preddata_portion), axis=0)
-
-                else:
-                    # If we're here, then there wasn't a prediction file uploaded for this flight.  That means we need to estimate some things and will use
-                    # the launch site location and elevation to estimate wind vectors for the first portion of the flight during which we didn't hear packets.
-
-                    # ascent_rates Columns:   altitude, latitude, longitude, altitude_rate, latitude_rate, longitude_rate
-                    # Reverse the ascent rates heard thus far...
-                    ascent_rates = ascent_rates[::-1]
-
-                    #print "======== ascent_rates (pre append) =========="
-                    #z = 0
-                    #for a in ascent_rates:
-                    #    print "ascent_rates[%d]:  " % z, ascent_rates[z]
-                    #    z += 1
-                    #print "================================"
-
-
-                    # Determine the index of the altitude within the prediction data that is closest to the smallest value from the received ascent data.
-                    # ...aka, the value of where our heard ascent packets started
-                    lowest_heard_altitude = float(ascent_rates[-1:, 0][0])
-
-                    # if the floor is still lower than this lowest heard altitude then we append a row with updated rates for lat, lon, and altitude...
-                    if floor < lowest_heard_altitude:
-
-                        # flightid | callsign | launchsite |  lat   |   lon    | alt
-                        #----------+----------+------------+--------+----------+------
-                        # TEST-001 | AE0SS-13 | Wiggins    | 40.228 | -104.075 | 4500
-                        # TEST-001 | KC0D-1   | Wiggins    | 40.228 | -104.075 | 4500
-
-                        # This is the location and elevation of the launch site (aka the balloon started its trip here)
-                        origin_x = float(flightids[i, 3])
-                        origin_y = float(flightids[i, 4])
-                        origin_alt = float(flightids[i, 5])
-
-                        # Different in the elevation at the launch site and the altitude of the balloon for the first packet we heard
-                        # first_packet columns:  timestamp, altitude, latitude, longitude
-                        dz = float(first_packet[1]) - origin_alt
-
-                        # Using the vertical rate observed from the first two packets heard from the balloon, we estimate the amount of time the balloon took
-                        # from the launch site, to the first packet we heard from it.  This is a comprimise (obviously), but it's better than not having an origin point
-                        # in the first place.
-                        time_to_first = dz / float(ascent_rates[-1:, 3][0])
-
-                        # The latitude and longitude angular rates
-                        latrate_to_first = (float(first_packet[2]) - origin_x) / time_to_first
-                        lonrate_to_first = (float(first_packet[3]) - origin_y) / time_to_first
-
-                        # Prepend our calculated entries for the first part of the flgiht to the ascent_rates numpy array
-                        tempray = []
-                        # ascent_rates Columns:   altitude, latitude, longitude, altitude_rate, latitude_rate, longitude_rate
-                        #tempray.append([first_packet[1], first_packet[2], first_packet[3], ascent_rates[-1:, 3][0], latrate_to_first, lonrate_to_first])
-
-                        j = float(floor)
-                        jx = origin_x
-                        jy = origin_y
-                        while j < lowest_heard_altitude:
-
-                            tempray.append([j, jx, jy, ascent_rates[-1:, 3][0], latrate_to_first, lonrate_to_first])
-
-                            # Different in the elevation at the launch site and the altitude of the balloon for the first packet we heard
-                            # first_packet columns:  timestamp, altitude, latitude, longitude
-                            dz = float(first_packet[1]) - j
-
-                            # Using the vertical rate observed from the first two packets heard from the balloon, we estimate the amount of time the balloon took
-                            # from the launch site, to the first packet we heard from it.  This is a comprimise (obviously), but it's better than not having an origin point
-                            # in the first place.
-                            time_to_first = dz / float(ascent_rates[-1:, 3][0])
-                            
-                            jx = jx + latrate_to_first * time_to_first
-                            jy = jy + latrate_to_first * time_to_first
-    
-                            j += 500
-
-                        #tempray.append([origin_alt, origin_x, origin_y, ascent_rates[-1:, 3][0], latrate_to_first, lonrate_to_first])
-                        tempray = np.array(tempray)
-                        #current_altitude = altitude_slice[-1]
-                        #if current_altitude < lowest_heard_altitude * 1.25:
-                        ascent_rates = np.concatenate((ascent_rates, tempray[::-1]), axis=0)
-                     
-        
-                        #print "======== variables =========="
-                        #print "lowest_heard_altitude: ", lowest_heard_altitude
-                        #print "time_to_first: ", time_to_first
-                        #print "dz: ", dz
-                        #print "origin_x: ", origin_x
-                        #print "origin_y: ", origin_y
-                        #print "dx: ", float(first_packet[2]) - origin_x
-                        #print "dy: ", float(first_packet[3]) - origin_y
-                        #print "origin_alt: ", origin_alt
-                        #print "================================" 
-
-
-        
-                # If the index of max altitude is less than the length of the of the flight...implies we've seen an alitude "hump" and are now descending
-                # ...AND we've seen at least 1 packet since the max altitude value was hit...
-                # ...AND the max altitude is > 14,999 feet (sanity check)...
-                # ...THEN continue on and try to predict a landing location for this flight
-                alt_sanity_threshold = 14999
-                if idx < (balloon_data.shape[0] - 1) and descent_portion.shape[0] > 1 and altitude_slice[idx] > alt_sanity_threshold:
-            
-                   # Slice off just the altitudes values from this balloon flight during the descent portion of the flight only
-                   balloon_altitudes = descent_portion[1:, 1]
-                
-                   # Calcuate the descent rates for the APRS packets received thus far
-                   balloon_velocities = []
-                   time_seconds_prev = 0
-                   alt_prev = 0
-                   thetime_prev = 0
-                   firsttime = 0
-                   for row in descent_portion:
-                        #thetime = datetime.datetime.strptime(row[0], "%d %b %Y  %H:%M:%S.%f")
-                        thetime = row[0]
-                        if firsttime == 0:
-                            time_delta = thetime
-                            firsttime = 1
-                        else:
-                            time_delta = thetime - thetime_prev
-                            balloon_velocities.append(abs(float(row[1] - alt_prev))/float(time_delta.total_seconds()))
-                        alt_prev = row[1]
-                        thetime_prev = thetime
-        
-                   # Convert these two arrays to be numpy arrays of type "float".
-                   # balloon_velocities:  contains a list of velocity values for this callsign during the descent portion of the flight
-                   # balloon_altitudes:  contains a list of altitude values for this callsign during the descent portion of the flight
-                   balloon_velocities = np.array(balloon_velocities, dtype='f')
-                   balloon_altitudes = np.array(balloon_altitudes, dtype='f')
-                 
-
-
-                   ### Here we need to determine the z-component of wind vectors by fitting a line to the vertical rate vs altitude  data.
-                   # this allows us to do two things:
-                   #    1) account for any upward or downward wind that is impacting (or will impact) the parachute as it's descending.
-                   #    2) and ultimately make the landing location prediction more accuruate for the given flight/callsign.
-                   # ascent_rates Columns:   altitude, latitude, longitude, altitude_rate, latitude_rate, longitude_rate
-                   arates_velocities = np.array(ascent_rates[0:, 3], dtype='f')
-                   arates_altitudes = np.array(ascent_rates[0:, 0], dtype='f')
-                   M, B = curve_fit(func_fittedline, arates_altitudes, arates_velocities)[0]
-                   #print "%s:%s  M, B: %.3f, %.3f" % (fid, callsign, M, B)
-                   p, e = curve_fit(func_x2, balloon_altitudes, balloon_velocities)
-        
-                   # this converts the ascent_rates array (calculated above) to be a Numpy array of "floats".
-                   # Columns for prediction data:   altitude, latitude, longitude, altitude_rate, latitude_rate, longitude_rate
-                   # this is the array that is used for obtaining wind vectors at various altitude levels.
-                   # columns:  altitude, lat, long, alt_rate, lat_rate, long_rate
-                   prediction_descent_data = np.array(ascent_rates, dtype='f')
-                   #print "======== ascent_rates (pre append) =========="
-                   #z = 0
-                   #for a in prediction_descent_data[0:5]:
-                   #    print "ascent_rates[%d]:  " % z, prediction_descent_data[z]
-                   #    z += 1
-                   #print "================================"
-        
-        	   # Columns for balloon data and descent_portion:  timestamp, altitude, latitude, longitude
-        	   x = balloon_data[-1, 2] 
-        	   y = balloon_data[-1, 3] 
-                   
-                   # This is basically the starting altitude for the prediction.  It's the last altitude value we received from the balloon.
-        	   backstop = float(descent_portion[-1, 1])
-
-
-                   #print "================== %s : %s ===================" % (fid, callsign)
-        
-        	   # Loop through adding up the lat/long changes, culminating in a predicted landing location
-                   last_heard_altitude = descent_portion[-1, 1]
-        	   for k in prediction_descent_data:
-        	       if k[0] < last_heard_altitude and k[0] >= floor:
-                           #drate = (adjust if k[0] == floor else func_x2(k[0], *p))
-                           #drate = func_x2(k[0], *p)
-                           delta = func_fittedline(k[0], M, B) - k[3] 
-                           drate = func_x2(k[0], *p) + delta
-        		   t = abs((k[0] - backstop) / drate)
-           		   dx = t * k[4]
-        		   dy = t * k[5]
-        		   #print "predloop:  alt: %g, backstop: %g, time_in_alt_level: %g, pred_descent_rate: %g, delta: %g" %(k[0], backstop, t, drate, delta)
-        		   x = x + dx
-        		   y = y + dy
-        		   backstop = k[0]
-
-                       # if we still have prediction data values to run through, but this first one is below our floor....
-                       # ...well, we still want to process lat/lon changes one more iteration to get our predictions to the floor level...then we quit the loop.
-#                       elif k[0] < last_heard_altitude and k[0] <= floor: 
-#                           #print "One last calculation at %.2f ft for %s:%s" % (k[0], fid, callsign)
-#        		   t = abs((floor - backstop) / func_x2(floor, *p))
-#           	           dx = t * k[4]
-#        	           dy = t * k[5]
-#        		   print "predloop2:  alt: %g, time_in_alt_level: %g, pred_descent_rate: %g" %(k[0], t, func_x2(k[0], *p))
-#        		   x = x + dx
-#        		   y = y + dy
-#        		   #backstop = k[0]
-        		   
-        	   # construct SQL for inserting the landing prediction into the landingpredictions table
-        	   landingprediction_sql = """insert into landingpredictions values (date_trunc('second', now())::timestamp, %s, %s, 'predicted', %s::numeric, ST_GeometryFromText('POINT(%s %s)', 4326));"""
-        	   landingcur.execute(landingprediction_sql, [ fid, callsign, np.float(p[0]), np.float(y), np.float(x) ])
-        	   landingconn.commit()
-        
-            i += 1
-        
-        
-        landingcur.close()
-        landingconn.close()
-    except pg.DatabaseError as error:
-        landingcur.close()
-        landingconn.close()
-        print(error)
-    except (GracefulExit, KeyboardInterrupt, SystemExit):
-        landingcur.close()
-        landingconn.close()
-        print "Landing predictor ended"
-
-
-##################################################
-# Landing Predictor Process
-##################################################
-def runLandingPredictor(schedule, altitude_floor, e):
-    try:
-        # run the landing predictor function continuously, every "schedule" seconds.
-        #while True:
-        while not e.is_set():
-            landingPredictor(altitude_floor)
-            time.sleep(schedule)
-            #e.wait(schedule)
-        print "Prediction scheduler ended"
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
-        print "Prediction scheduler ended"
-        pass
 
 
 
@@ -760,7 +265,7 @@ def getFrequencies(rtl=0):
             order by
             1 asc;
         """
- 
+
         # Execute the SQL query and fetch the results
         grcur.execute(grsql)
         rows = grcur.fetchall()
@@ -768,7 +273,7 @@ def getFrequencies(rtl=0):
         # The frequency list...
         # Always listen on 144.39MHz and send audio for that frequency on UDP port 12000
         fl = [(144390000, 12000 + rtl)]
- 
+
         # Now loop through all frequencies returned from the SQL query above
         u = 12001 + rtl
         for freq in rows:
@@ -778,7 +283,7 @@ def getFrequencies(rtl=0):
         # Close database connections
         grcur.close()
         grconn.close()
- 
+
         # Return our list of frequencies and their cooresponding UDP ports
         return fl
 
@@ -787,11 +292,11 @@ def getFrequencies(rtl=0):
         grconn.close()
         print(error)
         return None
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (GracefulExit, KeyboardInterrupt, SystemExit):
         grcur.close()
         grconn.close()
         return None
-    
+
 
 
 ##################################################
@@ -801,7 +306,7 @@ def getFrequencies(rtl=0):
 #    thehash = 0x73e2
 #
 #    localCall = call.upper().split("-")[0]
-#    
+#
 #    i = 0
 #    thelen = len(localCall)
 #    while i < thelen:
@@ -828,20 +333,20 @@ def getAPRSFilter(aprsRadius, callsign):
         # Database connection
         pgConnection = pg.connect(habconfig.dbConnectionString)
         pgCursor = pgConnection.cursor()
- 
+
         # SQL query to get our current (or last) GPS location in lat/lon
-        lastPositionSQL = """select 
-            tm::timestamp without time zone as time, 
-            speed_mph, 
-            bearing, 
-            altitude_ft, 
-            round(cast(ST_Y(location2d) as numeric), 3) as latitude, 
-            round(cast(ST_X(location2d) as numeric), 3) as longitude 
+        lastPositionSQL = """select
+            tm::timestamp without time zone as time,
+            speed_mph,
+            bearing,
+            altitude_ft,
+            round(cast(ST_Y(location2d) as numeric), 3) as latitude,
+            round(cast(ST_X(location2d) as numeric), 3) as longitude
 
-            from 
-            gpsposition 
+            from
+            gpsposition
 
-            order by 
+            order by
             tm desc limit 1;
         """
 
@@ -849,69 +354,69 @@ def getAPRSFilter(aprsRadius, callsign):
         pgCursor.execute(lastPositionSQL)
         rows = pgCursor.fetchall()
 
-        # Only build a radius-query for APRS-IS if there was a "latest" position reurned from the SQL query.  
+        # Only build a radius-query for APRS-IS if there was a "latest" position reurned from the SQL query.
         # ....granted, this location might be really old.
-        # Future note:  for those users that are running this from home, we need to provide a way for them to enter an arbitrary point to serve as the 
+        # Future note:  for those users that are running this from home, we need to provide a way for them to enter an arbitrary point to serve as the
         #               center of a large circle to capture packets from an active flight's tracking efforts.
         if len(rows) > 0:
             latitude = rows[0][4]
             longitude = rows[0][5]
-            aprsFilter = aprsFilter + " r/" + str(latitude) + "/" + str(longitude) + "/" + str(int(aprsRadius)) 
+            aprsFilter = aprsFilter + " r/" + str(latitude) + "/" + str(longitude) + "/" + str(int(aprsRadius))
         #print("aprsFilter1: %s\n" % aprsFilter)
 
 
         # SQL query to fetch the callsigns for beacons on active flights
-        activeBeaconsSql = """select 
-            f.flightid, 
-            fm.callsign 
+        activeBeaconsSql = """select
+            f.flightid,
+            fm.callsign
 
-            from 
-            flights f, 
-            flightmap fm 
+            from
+            flights f,
+            flightmap fm
 
-            where 
-            fm.flightid = f.flightid 
+            where
+            fm.flightid = f.flightid
             and f.active = true
-      
-            order by 
+
+            order by
             f.flightid desc,
             fm.callsign asc;
         """
-      
+
         # Execute the SQL query and fetch the results
         pgCursor.execute(activeBeaconsSql)
-        rows = pgCursor.fetchall() 
+        rows = pgCursor.fetchall()
 
         # Loop through each beacon callsign, building the APRS-IS filter string
         beaconFilter = ""
         for beacon in rows:
-            beaconFilter = beaconFilter + "/" + beacon[1] 
+            beaconFilter = beaconFilter + "/" + beacon[1]
         if len(rows) > 0:
-            aprsFilter = aprsFilter + " b" + beaconFilter 
+            aprsFilter = aprsFilter + " b" + beaconFilter
 
-    
-        # Loop through the first 9 beacons adding 50km friend filters for each one. 
+
+        # Loop through the first 9 beacons adding 50km friend filters for each one.
         friendFilter = ""
         for beacon in rows[0:9]:
             friendFilter = friendFilter + " f/" + beacon[1] + "/50"
         if len(rows) > 0:
-            aprsFilter = aprsFilter + friendFilter 
+            aprsFilter = aprsFilter + friendFilter
 
 
-        # SQL query to fetch the callsigns for trackers 
-#        trackerSql = """select 
+        # SQL query to fetch the callsigns for trackers
+#        trackerSql = """select
 #            t.callsign
 #
-#            from 
+#            from
 #            trackers t
-#  
+#
 #            order by
 #            t.callsign asc;
 #        """
-#      
+#
 #        # Execute the SQL query and fetch the results
 #        pgCursor.execute(trackerSql)
-#        rows = pgCursor.fetchall() 
+#        rows = pgCursor.fetchall()
 #
 #
 #        # Loop through each tracker callsign, building the APRS-IS filter string
@@ -919,12 +424,12 @@ def getAPRSFilter(aprsRadius, callsign):
 #        for tracker in rows:
 #            trackerFilter = trackerFilter + "/" + tracker[0] + "*"
 #        if len(rows) > 0:
-#            aprsFilter = aprsFilter + " b" + trackerFilter 
+#            aprsFilter = aprsFilter + " b" + trackerFilter
 #
         # Close database connection
         pgCursor.close()
         pgConnection.close()
- 
+
         #print("aprsFilter2: %s\n" % aprsFilter)
 
         # Return the resulting APRS-IS filter string
@@ -934,28 +439,28 @@ def getAPRSFilter(aprsRadius, callsign):
         pgCursor.close()
         pgConnection.close()
         print "Database error:  ", error
-    except (StopIteration, GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (StopIteration, GracefulExit, KeyboardInterrupt, SystemExit):
         pgCursor.close()
         pgConnection.close()
-        
+
 
 ##################################################
 # Write an incoming packet to the database
 ##################################################
 tapcur = None
-def writeToDatabase(x): 
-    # Note:  we don't want to open/close the database connection within this function because that would add a LOT of overhead 
-    #        as this function is called for every incoming packet.  DB connections are opened/closed in the calling function. 
+def writeToDatabase(x):
+    # Note:  we don't want to open/close the database connection within this function because that would add a LOT of overhead
+    #        as this function is called for every incoming packet.  DB connections are opened/closed in the calling function.
 
     global tapcur
     try:
         # Parse the raw APRS packet
         packet = aprslib.parse(x)
-        
+
         # The list of key names from the APRS packet structure (parsed above) that we're insterested in when inserting this packet into the database (down below).
         keys = ["object_name", "comment", "latitude", "longitude", "altitude", "course", "symbol", "symbol_table", "speed"]
 
-        # Set those field values to NULL if this packet does not include them....this allows us to insert a NULL value for this database field later down below. 
+        # Set those field values to NULL if this packet does not include them....this allows us to insert a NULL value for this database field later down below.
         for a in keys:
             if a not in packet:
                 packet[a] = ""
@@ -964,7 +469,7 @@ def writeToDatabase(x):
         # The usual stuff about if the symbol type for an APRS packet starts with a / or a \, then we need to choose the appropriate symbol table, etc..
         # ...basically getting the symbol returned from packet parsing (up above) consolidated down to just to characters as prep to inserting into the DB.
         if packet["symbol_table"] != "/" and packet["symbol_table"] != "":
-            packet["symbol"] = packet["symbol_table"] + packet["symbol"]  
+            packet["symbol"] = packet["symbol_table"] + packet["symbol"]
         elif packet["symbol_table"] == "/":
             packet["symbol"] = "/" + packet["symbol"]
 
@@ -982,11 +487,11 @@ def writeToDatabase(x):
         ppart = packet["raw"].partition(":")
         if ppart[2] != "":
             ptype = ppart[2][0]
-            info = ppart[2][1:] 
+            info = ppart[2][1:]
         else:
             ptype = ""
             info = ""
-        
+
         # For those APRS packets that have an "object name" (presumably for an APRS "object") then we set the "from" field to the "object name".
         # ...even though the object packet was likely transmitted from a different callsign/station, sitting the from field to this object name
         # makes for niceness downstream when displaying APRS items on the map.
@@ -999,68 +504,68 @@ def writeToDatabase(x):
         if packet["latitude"] == "" or packet["longitude"] == "":
             # SQL insert statement for packets that contain a location (i.e. lat/lon)
             sql = """insert into packets values (
-                now()::timestamp with time zone, 
-                %s, 
-                %s, 
-                (%s::numeric) * 0.6213712, 
-                %s::numeric, 
-                (%s::numeric) * 3.28084, 
-                %s, 
-                NULL, 
-                NULL, 
-                %s, 
-                %s, 
+                now()::timestamp with time zone,
+                %s,
+                %s,
+                (%s::numeric) * 0.6213712,
+                %s::numeric,
+                (%s::numeric) * 3.28084,
+                %s,
+                NULL,
+                NULL,
+                %s,
+                %s,
                 md5(%s)
             );"""
 
             # Execute the SQL statement
             tapcur.execute(sql, [
-                packet["from"], 
-                packet["symbol"], 
-                packet["speed"], 
-                packet["course"], 
-                packet["altitude"], 
-                packet["comment"], 
-                packet["raw"], 
-                ptype, 
+                packet["from"],
+                packet["symbol"],
+                packet["speed"],
+                packet["course"],
+                packet["altitude"],
+                packet["comment"],
+                packet["raw"],
+                ptype,
                 info
             ])
 
         else:
             # SQL insert statement for packets that DO NOT contain a location (i.e. lat/lon)
             sql = """insert into packets values (
-                now()::timestamp with time zone, 
-                %s, 
-                %s, 
-                (%s::numeric) * 0.6213712, 
-                %s::numeric, 
-                (%s::numeric) * 3.28084, 
-                %s, 
-                ST_GeometryFromText('POINT(%s %s)', 4326), 
-                ST_GeometryFromText('POINTZ(%s %s %s)', 4326), 
-                %s, 
-                %s, 
+                now()::timestamp with time zone,
+                %s,
+                %s,
+                (%s::numeric) * 0.6213712,
+                %s::numeric,
+                (%s::numeric) * 3.28084,
+                %s,
+                ST_GeometryFromText('POINT(%s %s)', 4326),
+                ST_GeometryFromText('POINTZ(%s %s %s)', 4326),
+                %s,
+                %s,
                 md5(%s)
             );"""
 
             # Execute the SQL statement
             tapcur.execute(sql, [
-                packet["from"], 
-                packet["symbol"], 
-                packet["speed"], 
-                packet["course"], 
-                packet["altitude"], 
-                packet["comment"], 
-                packet["longitude"], 
-                packet["latitude"], 
-                packet["longitude"], 
-                packet["latitude"], 
-                packet["altitude"], 
-                packet["raw"], 
+                packet["from"],
+                packet["symbol"],
+                packet["speed"],
+                packet["course"],
+                packet["altitude"],
+                packet["comment"],
+                packet["longitude"],
+                packet["latitude"],
+                packet["longitude"],
+                packet["latitude"],
+                packet["altitude"],
+                packet["raw"],
                 ptype,
                 info
             ])
-         
+
 
     except (ValueError, UnicodeEncodeError) as error:
         print "Encoding error: ", error
@@ -1074,7 +579,7 @@ def writeToDatabase(x):
     except (aprslib.ParseError, aprslib.UnknownFormat) as exp:
         #print "Unknown packet format:  %s, %s" % (datetime.datetime.now(), x)
         pass
-    except (StopIteration, GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (StopIteration, GracefulExit, KeyboardInterrupt, SystemExit):
         tapcur.close()
 
 
@@ -1082,40 +587,40 @@ def writeToDatabase(x):
 # Thread for updating the APRS-IS filter
 ##################################################
 def aprsFilterThread(callsign, a, r, e):
-    
+
     # The time in seconds in between updating the APRS-IS filter.
-    # 
-    delta = 15 
+    #
+    delta = 15
 
     try:
         # Loop forever (until this thread/process is killed) sleeping each time for "delta" seconds.
         #while True:
         while not e.is_set():
             # Sleep for delta seconds
-            time.sleep(delta)
-            #e.wait(delta)
+            #time.sleep(delta)
+            e.wait(delta)
 
             # Get a new APRS-IS filter string (i.e. our lat/lon location could have changed, beacon callsigns could have changed, etc.)
-            filterstring = getAPRSFilter(r, callsign) 
- 
+            filterstring = getAPRSFilter(r, callsign)
+
             #print "setting aprs filter:  ", filterstring
 
             # Put this filter into effect
             a.set_filter(filterstring)
             #print "Filter now: ", a.filter
 
-    except (StopIteration, GracefulExit, KeyboardInterrupt, SystemExit): 
-        pass
+    except (StopIteration, GracefulExit, KeyboardInterrupt, SystemExit):
+        print "Aprsc filter thread ended"
 
 
 
 ##################################################
 # Process for connecting to APRS-IS
 ##################################################
-def aprsTapWatchDog(a, e):
-    e.wait()
-    print "Watchdog closing APRS-IS tap..."
-    raise StopIteration("telling aprslib to stop")
+#def aprsTapWatchDog(a, e):
+#    e.wait()
+#    print "Watchdog closing APRS-IS tap..."
+#    raise StopIteration("telling aprslib to stop")
 
 
 ##################################################
@@ -1125,12 +630,12 @@ def aprsTapProcess(callsign, radius, e):
     global tapcur
 
     try:
- 
+
         #logging.basicConfig(level=0)
-        
-        # Connect to the aprsc process 
+
+        # Connect to the aprsc process
         # We always append "03" to callsign to ensure were connecting with a reasonably unique callsign (i.e. so we don't conflict with direwolf or other).
-        ais = aprslib.IS(callsign + "03", aprslib.passcode(callsign + "03"), host='127.0.0.1', port='14580')
+        ais = aprslib.IS(callsign + "03", aprslib.passcode(str(callsign) + "03"), host='127.0.0.1', port='14580')
 
         # database connection
         # the writeToDatabase function uses these connect variables
@@ -1140,27 +645,40 @@ def aprsTapProcess(callsign, radius, e):
 
         # ...see the getAPRSFilter function
         ais.set_filter(getAPRSFilter(radius, callsign))
- 
-        # wait for 5 seconds to give aprsc time to start
-        # Future note:  need to change this to use Lock's....
-        time.sleep(5)
-        #e.wait(5)
-        
-        ais.connect()
+
+        # Try to connect to the locally running aprsc instance...we attempt multiple times before giving up.
+        trycount = 0
+        while trycount < 5:
+            try:
+                # wait for 5 seconds before trying to connect
+                e.wait(5)
+
+                # Try to connect to aprsc
+                ais.connect()
+
+                # If connection was successful, then break out of this loop
+                print "Aprsc tap connection to local aprsc successful"
+                break
+            except aprslib.ConnectionError as error:
+                print "Aprsc tap error connecting to local aprsc, attempt #", trycount, ":  ", error
+
+            # Increment trycount each time through the loop
+            trycount += 1
 
         # This is the thread which updates the filter used with the APRS-IS connectipon
         aprsfilter = th.Thread(name="APRS-IS Filter", target=aprsFilterThread, args=(callsign, ais, radius, e))
         aprsfilter.setDaemon(True)
         aprsfilter.start()
 
-        watchdog = th.Thread(name="APRS-IS Tap Watchdog", target=aprsTapWatchDog, args=(ais, e))
-        watchdog.setDaemon(True)
-        watchdog.start()
+        #watchdog = th.Thread(name="APRS-IS Tap Watchdog", target=aprsTapWatchDog, args=(ais, e))
+        #watchdog.setDaemon(True)
+        #watchdog.start()
 
         # The consumer function blocks forever, calling the writeToDatabase function upon receipt of each APRS packet
         ais.consumer(writeToDatabase, blocking=True, raw=True)
-            
-    except (StopIteration, aprslib.ConnectionDrop, aprslib.ConnectionError, aprslib.LoginError, aprslib.ParseError) as error:
+
+    #except (StopIteration, aprslib.ConnectionDrop, aprslib.ConnectionError, aprslib.LoginError, aprslib.ParseError) as error:
+    except (aprslib.ConnectionDrop, aprslib.ConnectionError, aprslib.LoginError, aprslib.ParseError) as error:
         print "Closing APRS Tap: ", error
         ais.close()
         tapcur.close()
@@ -1172,11 +690,11 @@ def aprsTapProcess(callsign, radius, e):
         tapcur.close()
         tapconn.close()
         ais.close()
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (GracefulExit, KeyboardInterrupt, SystemExit):
         tapcur.close()
         tapconn.close()
         ais.close()
-        print "aprsTap ended 2"
+        print "aprsTap ended"
 
 
 ##################################################
@@ -1204,12 +722,12 @@ def getNumberOfSDRs():
 ##################################################
 # This creates the configuration file for Direwolf
 ##################################################
-def createDirewolfConfig(callsign, l):
+def createDirewolfConfig(callsign, l, configdata):
 
     # Name of the direwolf configuration file
-    filename = "/eosstracker/etc/direwolf.conf" 
+    filename = "/eosstracker/etc/direwolf.conf"
 
-    try: 
+    try:
 
         # Create or overwrite the direwolf configuration file.  We don't care if we overwrite it as the configuration is created dynamically each time.
         with open(filename, "w") as f:
@@ -1218,7 +736,7 @@ def createDirewolfConfig(callsign, l):
             rtl = 0
             adevice = 0
             channel = 0
-           
+
             # Loop through the frequency/port lists creating the audio device sections
             for freqlist in l:
                 f.write("################## RTL:  " + str(rtl) + " ################\n")
@@ -1237,15 +755,55 @@ def createDirewolfConfig(callsign, l):
                 f.write("###########################################\n\n")
                 rtl = rtl + 1
 
+            if configdata["includeeoss"] == "true":
+                eoss = ",EOSS"
+            else:
+                eoss=""
+
+            if configdata["overlay"] != "":
+                overlay = " overlay=" + str(configdata["overlay"])
+            else:
+                overlay = ""
+
+            f.write("GPSD\n\n")
+            if configdata["beaconing"] == "true":
+                f.write("###########################################\n\n")
+                f.write("# This is for beaconing our position\n")
+                f.write("ADEVICE" + str(adevice) + " plughw:" + str(configdata["audiodev"]) + ",0\n")
+                f.write("ARATE 48000\n")
+                f.write("ACHANNELS 1\n")
+                f.write("CHANNEL " + str(channel) + "\n")
+                f.write("MYCALL " + callsign + "\n")
+                f.write("MODEM 1200\n")
+                if configdata["serialport"] != "none":
+                    f.write("PTT " + str(configdata["serialport"]) + " " + str(configdata["serialproto"]) + "\n")
+                f.write("\n\n")
+                f.write("######### beaconing configuration #########\n")
+                f.write("TBEACON sendto=" + str(channel) + " delay=0:30 every=" + str(configdata["beaconlimit"]) + "  altitude=1    via=WIDE1-1,WIDE2-1" + str(eoss) + "      symbol=" + str(configdata["symbol"]) + overlay + "    comment=\"" + str(configdata["comment"]) +  "\"\n")
+                f.write("SMARTBEACONING " + str(configdata["fastspeed"]) + " " + str(configdata["fastrate"]) + "      " + str(configdata["slowspeed"]) + " " + str(configdata["slowrate"]) + "     " + str(configdata["beaconlimit"]) + "     " + str(configdata["fastturn"]) + " " + str(configdata["slowturn"]) + "\n")
+                f.write("###########################################\n\n")
+
+            if configdata["igating"] == "true" and configdata["ibeacon"] == "true":
+                f.write("########## for internet beaconing #########\n");
+                f.write("TBEACON sendto=IG  delay=0:40 every=" + str(configdata["ibeaconrate"]) + "  altitude=1  symbol=" + str(configdata["symbol"]) + overlay + "    comment=\"" + str(configdata["comment"]) +  "\"\n")
+                f.write("IBEACON sendto=IG  delay=0:40 every=" + str(configdata["ibeaconrate"]) + "\n")
+                #if configdata["beaconing"] == "false":
+                #    f.write("SMARTBEACONING " + str(configdata["fastspeed"]) + " " + str(configdata["fastrate"]) + "      " + str(configdata["slowspeed"]) + " " + str(configdata["slowrate"]) + "     " + str(configdata["beaconlimit"]) + "     " + str(configdata["fastturn"]) + " " + str(configdata["slowturn"]) + "\n")
+                f.write("###########################################\n\n")
+
+
             # The rest of the direwolf configuration
             # We're using the localhost address because that's where aprsc is running
             f.write("# APRS-IS Info\n")
             f.write("IGSERVER 127.0.0.1\n")
-        
+
             # Login info for aprsc
-            password = aprslib.passcode(callsign)
+            if configdata["igating"] == "true":
+                password = configdata["passcode"]
+            else:
+                password = aprslib.passcode(str(callsign))
             f.write("IGLOGIN " + callsign + " " + str(password) + "\n\n")
- 
+
             # The rest of the direwolf configuration
             f.write("AGWPORT 8000\n")
             f.write("KISSPORT 8001\n")
@@ -1255,7 +813,7 @@ def createDirewolfConfig(callsign, l):
     except (GracefulExit, KeyboardInterrupt, SystemExit):
         f.close()
         return ""
-    except IOError, error: 
+    except IOError, error:
         print "Unable to create direwolf configuration file.\n %s" % error
         return ""
 
@@ -1268,19 +826,19 @@ def direwolf(configfile="", logfile="", e = None):
     df_binary = "/usr/local/bin/direwolf"
 
     # if we don't have a proper configfile or logfile then we can't run Direwolf.  This should never happen, but just in case.
-    # The "logfile" referenced here is really just the redirected STDOUT from the direwolf instance.  This is different from the CSV log file... 
-    # ...that is selectable from the direwolf command line.  
+    # The "logfile" referenced here is really just the redirected STDOUT from the direwolf instance.  This is different from the CSV log file...
+    # ...that is selectable from the direwolf command line.
     if configfile == "" or configfile is None or logfile == "" or logfile is None:
         return -1
 
     # The command string and arguments for running direwolf
-    df_command = [df_binary, "-t", "0", "-c", configfile]
+    df_command = [df_binary, "-t", "0", "-T", "%H:%M:%S", "-c", configfile]
 
     try:
         # We open the logfile first, for writing
         l = open(logfile, "w")
-        
-        # Run the dirwolf command
+
+        # Run the direwolf command
         p = sb.Popen(df_command, stdout=l, stderr=l)
 
         # Wait for it to finish
@@ -1293,7 +851,7 @@ def direwolf(configfile="", logfile="", e = None):
             p.wait()
             print "Direwolf ended"
         l.close()
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (GracefulExit, KeyboardInterrupt, SystemExit):
         if p.poll() is None:
             print "Terminating direwolf..."
             p.terminate()
@@ -1306,18 +864,18 @@ def direwolf(configfile="", logfile="", e = None):
 ##################################################
 # Build the aprsc configuration file
 ##################################################
-def createAprscConfig(filename, callsign):
+def createAprscConfig(filename, callsign, igate):
 
     # Name of the aprsc configuration file.  If not provided then we can't run aprsc.  This should never happen, but just in case.
     if filename == "" or filename is None:
         return -1
 
     try:
-   
+
     # Create or overwrite the aprsc configuration file
         with open(filename, "w") as f:
             f.write("ServerId " + callsign + "\n")
-            password = aprslib.passcode(callsign)
+            password = aprslib.passcode(str(callsign))
             f.write("PassCode " + str(password) + "\n")
             f.write("MyAdmin \"HAB Tracker\"\n")
             f.write("MyEmail me@emailnotset.local\n")
@@ -1329,12 +887,13 @@ def createAprscConfig(filename, callsign):
             f.write("Listen \"\"                                         fullfeed udp ::  10152 hidden\n")
             f.write("Listen \"Client-Defined Filters\"                   igate tcp ::  14580\n")
             f.write("Listen \"\"                                         igate udp ::  14580\n")
-            
-            # This is set to be a read only connection to APRS-IS.  That is, we're not going to upload packets to any defined Uplink connections.
-            f.write("Uplink \"Core rotate\" ro  tcp  noam.aprs2.net 10152\n")
-            
-            # Future note:  for uploading packets received over RF (aka from Direwolf), we'll need to set this to "full" instead of "ro". 
-            #f.write("Uplink \"Core rotate\" full  tcp  noam.aprs2.net 10152\n")
+
+            if igate == "true":
+                # For uploading packets received over RF (aka from Direwolf), set this to "full" instead of "ro".
+                f.write("Uplink \"Core rotate\" full  tcp  noam.aprs2.net 10152\n")
+            else:
+                # This is set to be a read only connection to APRS-IS.  That is, we're not going to upload packets to any defined Uplink connections.
+                f.write("Uplink \"Core rotate\" ro  tcp  noam.aprs2.net 10152\n")
 
             f.write("HTTPStatus 0.0.0.0 14501\n")
             f.write("FileLimit        10000\n")
@@ -1342,7 +901,7 @@ def createAprscConfig(filename, callsign):
         return 0
     except (GracefulExit, KeyboardInterrupt, SystemExit):
         return -1
-    except IOError, error: 
+    except IOError, error:
         print "Unable to create aprsc configuration file.\n %s" % error
         return -1
 
@@ -1364,8 +923,8 @@ def aprsc(configfile, e):
     # For reference we must run aprsc as root (thus the need for sudo) so that it can chroot to the /opt/aprsc path.
     # For example:
     #     sudo /opt/aprsc/sbin/aprsc -u aprsc -t /opt/aprsc -e info -o file -r logs -c etc/aprsc-tracker.conf
- 
-    # To run aprsc, we must be root, so we're going to use sudo to do that.  This assumes, that the user running this script has 
+
+    # To run aprsc, we must be root, so we're going to use sudo to do that.  This assumes, that the user running this script has
     # been given permission to start and stop (i.e. kill) the aprsc process without a password.
     # The command string and arguments for running aprsc
     aprsc_command = ["sudo", aprsc_binary, "-u", "aprsc", "-t", "/opt/aprsc", "-e", "info", "-o", "file", "-r", "logs", "-c", config_file]
@@ -1373,10 +932,10 @@ def aprsc(configfile, e):
     try:
         # Run the aprsc command
         p = sb.Popen(aprsc_command)
-        
+
         # Wait for it to finish
-        #p.wait()
-        e.wait()
+        p.wait()
+        #e.wait()
         if p.poll() is None:
             print "aprsc is still running..."
             killem = ["sudo", "pkill", "aprsc"]
@@ -1385,7 +944,7 @@ def aprsc(configfile, e):
             print "Waiting for aprsc to end..."
             p.wait()
             print "aprsc ended"
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
+    except (GracefulExit, KeyboardInterrupt, SystemExit):
         if p.poll() is None:
             print "aprsc is still running..."
             killem = ["sudo", "pkill", "aprsc"]
@@ -1412,10 +971,10 @@ def argument_parser():
         "", "--algoFloor", dest="algoFloor", type="intx", default=4900,
         help="Set the elevation floor (in feet) for how low the landing predictor will compute landing locations  [default=%default]")
     parser.add_option(
-        "", "--algoInterval", dest="algoInterval", type="intx", default=13,
+        "", "--algoInterval", dest="algoInterval", type="intx", default=20,
         help="How often (in secs) the landing predictor run [default=%default]")
     parser.add_option(
-        "", "--kill", dest="kill", action="store_true", 
+        "", "--kill", dest="kill", action="store_true",
         help="Use this option to kill any existing processes then exit")
     return parser
 
@@ -1436,7 +995,7 @@ def isRunning(myprocname):
     for proc in psutil.process_iter():
        # Get process detail as dictionary
        pInfoDict = proc.as_dict(attrs=['pid', 'ppid', 'name', 'exe', 'memory_percent' ])
-   
+
        # check for a name match...
        for p in procs:
            if p in pInfoDict["name"].lower():
@@ -1470,37 +1029,37 @@ def main():
         if p["pid"] != mypid:
             pids.append(p["pid"])
     pids.sort()
- 
+
     # If the kill switch was given the we kill these pids
     if options.kill:
         print "Killing processes..."
         for pid in pids:
-    
-            try: 
+
+            try:
                 # kill this pid
                 os.kill(pid, signal.SIGTERM)
             except Exception as e:
                 print "Unable to kill %d, %s" % (pid, e)
-    
+
             # we give it a little time to work before going to the next pid
             time.sleep(1)
-  
+
         # check if anything is still running
-        proclist = isRunning(thisprocname) 
+        proclist = isRunning(thisprocname)
         leftoverpids = []
         for p in proclist:
             if p["pid"] != mypid:
                 leftoverpids.append(p["pid"])
         leftoverpids.sort()
-       
+
         # now kill any leftovers
         for pid in leftoverpids:
-            try: 
+            try:
                 # kill this pid
                 os.kill(pid, signal.SIGTERM)
             except Exception as e:
                 print "Unable to kill %d, %s" % (pid, e)
-    
+
             # we give it a little time to work before going to the next pid
             time.sleep(1)
 
@@ -1508,7 +1067,7 @@ def main():
         print "Done."
         sys.exit()
 
-    else:  
+    else:
         # if there are running pids and we didn't get the kill switch, then exit
         if len(pids) > 0:
             print "Processes are running, exiting."
@@ -1516,12 +1075,35 @@ def main():
 
     # --------- end of process checking section ----------
 
-   
-    # this is the supplied or the default callsign, but converted to uppercase
-    callsign = options.callsign.upper()
+
+    # --------- Read in the configuration file (if it exists) --------
+    # This is normally in ../www/configuration/config.txt
+    try:
+        with open('/eosstracker/www/configuration/config.txt') as json_data:
+            configuration = json.load(json_data)
+    except:
+        # Otherwise, we assume the callsign from the command line and do NOT perform igating or beaconing
+        configuration = { "callsign" : options.callsign, "igating" : "false", "beaconing" : "false" }
+
+    ## Now check for default values for all of the configuration keys we care about.  Might need to expand this to be more robust/dynamic in the future.
+    defaultkeys = {"timezone":"America/Denver","callsign":"","lookbackperiod":"180","iconsize":"24","plottracks":"off", "ssid" : "9", "igating" : "false", "beaconing" : "false", "passcode" : "", "fastspeed" : "45", "fastrate" : "01:00", "slowspeed" : "5", "slowrate" : "10:00", "beaconlimit" : "00:35", "fastturn" : "20", "slowturn": "60", "audiodev" : "0", "serialport": "none", "serialproto" : "RTS", "comment" : "EOSS Tracker", "includeeoss" : "true", "symbol" : "/k", "overlay" : "", "ibeaconrate" : "15:00", "ibeacon" : "false"}
+
+    for the_key, the_value in defaultkeys.iteritems():
+        if the_key not in configuration:
+            configuration[the_key] = the_value
+
+    # If the callsign is empty, we use the default one from the command line.
+    if configuration["callsign"] == "":
+        configuration["callsign"] = options.callsign
+
+    if configuration["igating"] == "true":
+        if str(aprslib.passcode(str(configuration["callsign"]))) != str(configuration["passcode"]):
+            print "Inocorrect passcode, ", str(configuration["passcode"]), " != ", aprslib.passcode(str(configuration["callsign"])), ", provided, igating disabled."
+            configuration["igating"] = "false"
+
 
     print "Starting HAB Tracker backend daemon"
-    print "Callsign:  %s" % callsign
+    print "Callsign:  %s" % str(configuration["callsign"])
     print "APRS-IS Radius: %dkm" % options.aprsisRadius
     print "Algorithm Floor: %dft (this will auto-adjust)" % options.algoFloor
     print "Algorithm Interval: %ds" % options.algoInterval
@@ -1547,31 +1129,36 @@ def main():
         # The number of SDRs
 #        i = len(sdrs)
         i = 0
- 
+
         print "Number of SDRs: ", i
 
-        #  RF mode:  
+        #  RF mode:
         #      - we do start aprsc, but only have it connect as "read-only" to APRS-IS (regardless if we want to igate or not)
         #      - we don't start GnuRadio processes
         #      - we don't start Direwolf
-        #   
-        #  Online-only mode: 
+        #
+        #  Online-only mode:
         #      - we do start aprsc, and connect in "read-only" mode (unless, future-tense here, we want to upload packets to the internet)
         #      - we do start GnuRadio processes
-        #      - we do start Direwolf and have it connect to the aprsc instance via "localhost" 
+        #      - we do start Direwolf and have it connect to the aprsc instance via "localhost"
 
         # Create the aprsc configuration file
         # We're assuming the path to this is the standard install path for aprsc, /opt/aprsc/etc/...
         # We always append "01" to the callsign to ensure that it's unique for APRS-IS
         aprsc_configfile = "/opt/aprsc/etc/tracker-aprsc.conf"
-#        if createAprscConfig(aprsc_configfile, callsign + "01") < 0:
-#            sys.exit()
-       
+
+        # This generates a random number to append to the callsign and pads to such that the server ID is always 9 characters in length
+        numRandomDigits = 9 - len(configuration["callsign"])
+        aprscServerId = str(configuration["callsign"]) + str(random.randint(5, 10 ** numRandomDigits - 1)).zfill(numRandomDigits)
+
+        if createAprscConfig(aprsc_configfile, aprscServerId, configuration["igating"]) < 0:
+            sys.exit()
+
         # This is the aprsc process
         aprscprocess = mp.Process(target=aprsc, args=(aprsc_configfile, stopevent))
         aprscprocess.daemon = True
         aprscprocess.name = "aprc"
-        processes.append(aprscprocess) 
+        processes.append(aprscprocess)
 
         status = {}
         antennas = []
@@ -1583,37 +1170,43 @@ def main():
             # will prevent us from consuming all USB sticks attached to a system.
             k = 0
 
-            print "Using SDR:  ", sdrs[0]
+            while k < i:
 
-            status["rf_mode"] = 1
-            # Get the frequencies to be listened to (ex. 144.39, 144.34, etc.) and UDP port numbers for xmitting the audio over
-            freqlist = getFrequencies(k)
+                print "Using SDR:  ", sdrs[k]
 
-            # Append this frequency list to our list for later json output
-            ant = {}
-            ant["rtl_id"] = k
-            ant["frequencies"] = []
-            ant["rtl_serialnumber"] = sdrs[k]["serialnumber"]
-            ant["rtl_manufacturer"] = sdrs[k]["manufacturer"]
-            ant["rtl_product"] = sdrs[k]["product"]
-            for freq,udpport in freqlist:
-                ant["frequencies"].append({"frequency": round(freq/1000000.0, 3), "udp_port": udpport})
-            antennas.append(ant) 
+                status["rf_mode"] = 1
+                # Get the frequencies to be listened to (ex. 144.39, 144.34, etc.) and UDP port numbers for xmitting the audio over
+                freqlist = getFrequencies(k)
 
-            # append this frequency/UDP port list to the list for Direwolf
-            direwolfFreqList.append(freqlist)
+                # Append this frequency list to our list for later json output
+                ant = {}
+                ant["rtl_id"] = k
+                ant["frequencies"] = []
+                ant["rtl_serialnumber"] = sdrs[k]["serialnumber"]
+                ant["rtl_manufacturer"] = sdrs[k]["manufacturer"]
+                ant["rtl_product"] = sdrs[k]["product"]
+                for freq,udpport in freqlist:
+                    ant["frequencies"].append({"frequency": round(freq/1000000.0, 3), "udp_port": udpport})
+                antennas.append(ant)
 
-            # This is the GnuRadio process
-            grprocess = mp.Process(target=GRProcess, args=(freqlist, k, stopevent))
-            grprocess.daemon = True
-            grprocess.name = "GnuRadio_" + str(k)
-            processes.append(grprocess)
+                # append this frequency/UDP port list to the list for Direwolf
+                direwolfFreqList.append(freqlist)
+
+                # This is the GnuRadio process
+                grprocess = mp.Process(target=GRProcess, args=(freqlist, k, stopevent))
+                grprocess.daemon = True
+                grprocess.name = "GnuRadio_" + str(k)
+                processes.append(grprocess)
+
+                k += 1
 
             # Create Direwolf configuration file
-            if callsign == "E0SS":
-                filename = createDirewolfConfig(callsign + "02", direwolfFreqList)
+            if configuration["igating"] == "false" and configuration["beaconing"] == "false":
+                filename = createDirewolfConfig(str(configuration["callsign"]) + "02", direwolfFreqList, configuration)
+                status["direwolfcallsign"] = str(configuration["callsign"]) + "02"
             else:
-                filename = createDirewolfConfig(callsign, direwolfFreqList)
+                filename = createDirewolfConfig(str(configuration["callsign"]) + "-" +  str(configuration["ssid"]), direwolfFreqList, configuration)
+                status["direwolfcallsign"] = str(configuration["callsign"]) + "-" + str(configuration["ssid"])
 
             logfile = "/eosstracker/logs/direwolf.out"
 
@@ -1623,15 +1216,23 @@ def main():
             processes.append(dfprocess)
         else:
             status["rf_mode"] = 0
-           
-        status["antennas"] = antennas 
+            status["direwolfcallsign"] = ""
+
+        status["antennas"] = antennas
+        status["igating"] = configuration["igating"]
+        status["beaconing"] = configuration["beaconing"]
+        status["active"] = 1
+
+        ts = datetime.datetime.now()
+        status["starttime"] = ts.strftime("%Y-%m-%d %H:%M:%S")
+        status["timezone"] = str(configuration["timezone"])
         print "\n"
         print "JSON:", json.dumps(status)
         print "\n"
 
 
         # This is the APRS-IS connection tap.  This is the process that is respoonsible for inserting APRS packets into the database
-        aprstap = mp.Process(name="APRS-IS Tap", target=aprsTapProcess, args=(callsign, options.aprsisRadius, stopevent))
+        aprstap = mp.Process(name="APRS-IS Tap", target=aprsTapProcess, args=(str(configuration["callsign"]), options.aprsisRadius, stopevent))
         aprstap.daemon = True
         aprstap.name = "APRS-IS Tap"
         processes.append(aprstap)
@@ -1643,28 +1244,59 @@ def main():
         processes.append(gpsprocess)
 
         # This is the landing predictor process
-        landingprocess = mp.Process(target=runLandingPredictor, args=(options.algoInterval, options.algoFloor, stopevent))
+        landingprocess = mp.Process(target=lp.runLandingPredictor, args=(options.algoInterval, options.algoFloor, stopevent, configuration))
         landingprocess.daemon = True
         landingprocess.name = "Landing Predictor"
         processes.append(landingprocess)
-
 
 
         # Loop through each process starting it
         for p in processes:
             #print "Starting:  %s" % p.name
             p.start()
-    
+
+
+        # Save the operating mode and status to a JSON file
+        jsonStatusFile = "/eosstracker/www/daemonstatus.json"
+        jsonStatusTempFile = "/eosstracker/www/daemonstatus.json.tmp"
+        with open(jsonStatusTempFile, "w") as f:
+            f.write(json.dumps(status))
+        if os.path.isfile(jsonStatusTempFile):
+            os.rename(jsonStatusTempFile, jsonStatusFile)
+
+
         # Join each process (which blocks until the sub-process ends)
         for p in processes:
             p.join()
 
-    except (GracefulExit, KeyboardInterrupt, SystemExit): 
-        print "Setting stop event..."
-        stopevent.set()
+    except (KeyboardInterrupt):
+        # The KeyboardInterrupt event is caught by all of the individual threads/processes so we just need to wait for them to finish
         for p in processes:
             print "Waiting for [%s] %s to end..." % (p.pid, p.name)
             p.join()
+
+    except (GracefulExit, SystemExit):
+        # Set this event to be as graceful as we can for shutdown...
+        print "Setting stop event..."
+
+        stopevent.set()
+        # For catching a kill signal, we need to tell the individual processes to terminate
+        for p in processes:
+            print "Waiting for [%s] %s to end..." % (p.pid, p.name)
+            p.terminate()
+            p.join()
+
+    # Save the operating mode and status to a JSON file...as basically empty as we're now shutting down
+    jsonStatusFile = "/eosstracker/www/daemonstatus.json"
+    jsonStatusTempFile = "/eosstracker/www/daemonstatus.json.tmp"
+    status = {}
+    status["antennas"] = []
+    status["rf_mode"] = 0
+    status["active"] = 0
+    with open(jsonStatusTempFile, "w") as f:
+        f.write(json.dumps(status))
+    if os.path.isfile(jsonStatusTempFile):
+        os.rename(jsonStatusTempFile, jsonStatusFile)
 
     print "\nDone."
 

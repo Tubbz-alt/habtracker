@@ -1,11 +1,34 @@
 <?php
-    ###  This will query the database for the n most recent packets.  
+/*
+*
+##################################################
+#    This file is part of the HABTracker project for tracking high altitude balloons.
+#
+#    Copyright (C) 2019, Jeff Deaton (N6BA)
+#
+#    HABTracker is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    HABTracker is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with HABTracker.  If not, see <https://www.gnu.org/licenses/>.
+#
+##################################################
+*
+ */
+
 
     session_start();
     $documentroot = $_SERVER["DOCUMENT_ROOT"];
     include $documentroot . '/common/functions.php';
-    include $documentroot . '/common/sessionvariables.php';
 
+    $config = readconfiguration();
     
     function coord_distance($lat1, $lon1, $lat2, $lon2) {
         $p = pi()/180;
@@ -35,12 +58,8 @@
 
 
 
-    if (isset($_GET["type"])) {
-        $prediction_type = $_GET["type"];
-    }
-    else {
-        $prediction_type = "predicted"; 
-    }
+    // For future use...
+    $prediction_type = "predicted"; 
     
     if (isset($_GET["flightid"])) {
         $get_flightid = $_GET["flightid"];
@@ -58,8 +77,29 @@
     }
     
     ## get the landing predictions...
-    $query = 'select l.tm, l.flightid, l.callsign, l.thetype, ST_Y(l.location2d) as lat, ST_X(l.location2d) as long from landingpredictions l, flights f where f.flightid = l.flightid and f.active = \'t\' and l.thetype = $1 and l.flightid = $2 and l.tm > (now() - (to_char((\'' . $lookbackperiod . ' minute\')::interval, \'HH24:MI:SS\'))::time)  order by l.tm, l.flightid, l.callsign;';
-    $result = pg_query_params($link, $query, array($prediction_type, $get_flightid));
+    $query = 'select 
+        l.tm, 
+        l.flightid, 
+        l.callsign, 
+        l.thetype, 
+        ST_Y(l.location2d) as lat, 
+        ST_X(l.location2d) as long 
+
+        from 
+        landingpredictions l, 
+        flights f 
+
+        where 
+        f.flightid = l.flightid 
+        and f.active = \'t\' 
+        and l.flightid = $1 
+        and l.tm > (now() - (to_char(($2)::interval, \'HH24:MI:SS\'))::time)  
+
+        order by 
+        l.tm asc, 
+        l.flightid, 
+        l.callsign;';
+    $result = pg_query_params($link, $query, array(sql_escape_string($get_flightid), sql_escape_string($config["lookbackperiod"] . " minute")));
     if (!$result) {
         db_error(sql_last_error());
         sql_close($link);
@@ -67,13 +107,15 @@
     }
     $features = array();
     while ($row = sql_fetch_array($result)) {
+        $thetime = $row['tm'];
+        $thetype = $row['thetype'];
         $flightid = $row['flightid'];
         $callsign = $row['callsign'];
         $latitude = $row['lat'];
         $longitude = $row['long'];
-        $features[$callsign][$latitude . $longitude] = array($latitude, $longitude);
+        if ($thetype == "predicted") 
+            $features[$callsign][$thetime. $latitude . $longitude] = array($latitude, $longitude);
     }
-
 
     printf ("{ \"type\" : \"FeatureCollection\", \"properties\" : { \"name\" : \"Landing Predictions\" }, \"features\" : [");
 
@@ -83,13 +125,14 @@
             printf (", ");
         $firsttimeinloop = 0;
         printf ("{ \"type\" : \"Feature\",");
-        printf ("\"properties\" : { \"id\" : %s, \"callsign\" : %s, \"tooltip\" : %s,  \"symbol\" : %s, \"comment\" : %s, \"frequency\" : \"\", \"altitude\" : \"\", \"time\" : \"\", \"objecttype\" : \"landingprediction\", \"label\" : %s },", 
-            json_encode($callsign . "_landing_" . $prediction_type), 
+        printf ("\"properties\" : { \"id\" : %s, \"callsign\" : %s, \"tooltip\" : %s,  \"symbol\" : %s, \"comment\" : %s, \"frequency\" : \"\", \"altitude\" : \"\", \"time\" : \"\", \"objecttype\" : \"landingprediction\", \"label\" : %s, \"iconsize\" : %s },", 
+            json_encode($callsign . "_landing_predicted"), 
             json_encode($callsign . " Predicted Landing"), 
             json_encode($callsign . " Landing"), 
             json_encode("/J"), 
             json_encode("Landing prediction"),
-            json_encode($callsign . " Landing")
+	    json_encode($callsign . " Landing"),
+	    json_encode($config["iconsize"])
         );
         printf ("\"geometry\" : { \"type\" : \"Point\", \"coordinates\" : [%s, %s]}", end($features[$callsign])[1], end($features[$callsign])[0]);
         printf ("}");

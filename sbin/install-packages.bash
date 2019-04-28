@@ -2,9 +2,9 @@
 #
 # This script will automagically install all the required packages from a bare metal
 # Ubuntu 18.04 LTS required for the EOSS tracker software.
-# 
+#
 # Run this as the root user:
-# 
+#
 #     For example:
 #     $ sudo ./install-packages.bash
 #
@@ -34,7 +34,7 @@ echo "Installing Apache web server..."
 apt-get -y install apache2 apache2-dev
 echo ""
 
-sleep 1 
+sleep 1
 echo "Installing OpenStreetMap..."
 apt-get -y install libboost-all-dev git-core tar unzip wget bzip2 build-essential autoconf libtool libxml2-dev libgeos-dev libgeos++-dev libpq-dev libbz2-dev libproj-dev munin-node munin libprotobuf-c0-dev protobuf-c-compiler libfreetype6-dev libtiff5-dev libicu-dev libgdal-dev libcairo-dev libcairomm-1.0-dev apache2 apache2-dev libagg-dev liblua5.2-dev ttf-unifont lua5.1 liblua5.1-dev libgeotiff-epsg curl
 echo ""
@@ -71,8 +71,14 @@ apt-get -y install gnuradio gnuradio-dev
 echo ""
 
 sleep 1
-echo "Instaling GPSd and gr-osmosdr..."
+echo "Installing GPSd and gr-osmosdr..."
 apt-get -y install gpsd gpsd-clients gr-osmosdr
+echo ""
+
+sleep 1
+echo "Installing alsa-utils and removing pulseaudio..."
+apt-get -y install alsa-utils
+apt-get -y remove pulseaudio
 echo ""
 
 sleep 1

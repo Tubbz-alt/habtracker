@@ -1,10 +1,35 @@
 <?php
+/*
+*
+##################################################
+#    This file is part of the HABTracker project for tracking high altitude balloons.
+#
+#    Copyright (C) 2019, Jeff Deaton (N6BA)
+#
+#    HABTracker is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    HABTracker is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with HABTracker.  If not, see <https://www.gnu.org/licenses/>.
+#
+##################################################
+*
+ */
+
     ###  This will query the database for the n most recent packets.  
 
     session_start();
     $documentroot = $_SERVER["DOCUMENT_ROOT"];
     include $documentroot . '/common/functions.php';
-    include $documentroot . '/common/sessionvariables.php';
+
+    $config = readconfiguration();
   
     if (isset($_GET["flightid"])) {
         $get_flightid = $_GET["flightid"];
@@ -37,6 +62,8 @@
     }
 
 
+//    print_r ($_SESSION);
+ //   printf ("<br>");
 
     ## Connect to the database
     $link = connect_to_database();
@@ -68,21 +95,27 @@ trackers tr
 where 
 b.callsign is null
 and a.location2d != \'\' 
-and a.tm > (now() - (to_char((\'' . $lookbackperiod . ' minute\')::interval, \'HH24:MI:SS\'))::time)
-and a.callsign like tr.callsign || \'-%\'
+and a.tm > (now() - (to_char(($1)::interval, \'HH24:MI:SS\'))::time) 
+and case
+   when tr.callsign similar to \'[A-Z]{1,2}[0-9][A-Z]{1,3}-[0-9]{1,2}\' then
+       a.callsign  = tr.callsign
+   else 
+       a.callsign like tr.callsign || \'-%\'
+end
 and tr.tactical = t.tactical ' .
-($get_flightid == "" ? " and t.flightid is null " : " and t.flightid = $1 ") . '
+($get_flightid == "" ? " and t.flightid is null " : " and t.flightid = $2 ") . '
 
 order by 
 thetime asc, 
 a.callsign ;'; 
 
-    //printf ("<br>%s<br><br><br>", $query);
+#--and a.callsign like tr.callsign || \'-%\'
+
 
     if ($get_flightid == "")
-        $result = sql_query($query);
+        $result = pg_query_params($link, $query, array(sql_escape_string($config["lookbackperiod"] . " minute")));
     else
-        $result = pg_query_params($link, $query, array(sql_escape_string($get_flightid)));
+        $result = pg_query_params($link, $query, array(sql_escape_string($config["lookbackperiod"] . " minute"), sql_escape_string($get_flightid)));
 
     if (!$result) {
         db_error(sql_last_error());
@@ -138,7 +171,7 @@ a.callsign ;';
        
         /* This prints out the GeoJSON object for this station */
         printf ("{ \"type\" : \"Feature\",\n");
-        printf ("\"properties\" : { \"id\" : %s, \"callsign\" : %s, \"time\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : %s, \"tooltip\" : %s, \"label\" : %s },\n", 
+        printf ("\"properties\" : { \"id\" : %s, \"callsign\" : %s, \"time\" : %s, \"symbol\" : %s, \"altitude\" : %s, \"comment\" : %s, \"tooltip\" : %s, \"label\" : %s, \"iconsize\" : %s },\n", 
             json_encode($callsign), 
             json_encode($callsign), 
             json_encode($positioninfo[$callsign][0]), 
@@ -146,11 +179,12 @@ a.callsign ;';
             json_encode($positioninfo[$callsign][4]), 
             json_encode("Tactical:  " . $positioninfo[$callsign][6] . ($positioninfo[$callsign][5] == "" ? "" : "<br>") . $positioninfo[$callsign][5]), 
             json_encode($positioninfo[$callsign][6]),
-            json_encode($positioninfo[$callsign][6])
+            json_encode($positioninfo[$callsign][6]),
+            json_encode($config["iconsize"])
         );
         printf ("\"geometry\" : { \"type\" : \"Point\", \"coordinates\" : [%s, %s]}\n", $positioninfo[$callsign][3], $positioninfo[$callsign][2]);
         printf ("}");
-        if (count($ray) > 1 && $plottracks == "on") {
+        if (count($ray) > 1 && $config["plottracks"] == "on") {
             printf (", ");
             foreach ($ray as $k => $elem) {
                 $linestring[] = array($elem[1], $elem[0]);
