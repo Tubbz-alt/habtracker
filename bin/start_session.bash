@@ -33,7 +33,7 @@
 #     This is the catch-all default callsign when operating in read-only (Internet) and receive-only (RF) mode.  It is NOT used
 #     when a user has entered their callsign through the web setup screens (ex. under Setup-->System Configuration).  This doesn't
 #     need to be edited.
-CALLSIGN="E0SS"
+CALLSIGN="AE0SS"
 
 
 # This is the elevation at the predicted landing location.  This is a starting value as the algorithm will auto-adjust this to
