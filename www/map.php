@@ -44,20 +44,20 @@
         $get_showallstations = 1;
     else
         $get_showallstations = 0;
-    
+
     if (isset($_GET["latitude"]))
         $get_latitude = $_GET["latitude"];
-    else 
+    else
         $get_latitude = "";
 
     if (isset($_GET["longitude"]))
         $get_longitude = $_GET["longitude"];
-    else 
+    else
         $get_longitude = "";
 
     if (isset($_GET["zoom"]))
         $get_zoom = $_GET["zoom"];
-    else 
+    else
         $get_zoom = "";
 
 
@@ -75,7 +75,7 @@
         sql_close($link);
         return 0;
     }
- 
+
 /*
     if (sql_num_rows($result) <= 0) {
         sql_close($link);
@@ -88,7 +88,7 @@
     $flightlist = [];
     $flightlist = sql_fetch_all($result);
     $numflights = sql_num_rows($result);
-    
+
 
     while($row = sql_fetch_array($result)) {
         $flightid = $row["flightid"];
@@ -99,7 +99,7 @@
             sql_close($link);
             return 0;
         }
-        
+
         $object = [];
         $callsigns = [];
         while ($row2 = sql_fetch_array($result2)) {
@@ -117,7 +117,7 @@
 <script>
 
     var flightids = <?php echo json_encode($output); ?>;
- 
+
     var followfeatureid = "<?php echo $get_followfeatureid; ?>";
     var showallstations = "<?php echo $get_showallstations; ?>";
     var latitude = "<?php echo $get_latitude; ?>";
@@ -283,7 +283,7 @@ function getTrackers() {
             $.get("gettrackers.php", function(data) {
                 var trackerJson = JSON.parse(data);
                 var keys = Object.keys(trackerJson);
-                var i; 
+                var i;
                 var j;
                 var k;
                 var teamhtml;
@@ -293,10 +293,10 @@ function getTrackers() {
                 var tablediv = document.getElementById("trackers");
                 table.setAttribute("class", "trackerlist");
                 //table.setAttribute("style", "width: auto");
- 
+
                 //The columns
                 var columns = ["Team and Flight Assignment", "Callsign", "Move to This Team"];
-     
+
                 //Add the header row.
                 var row = table.insertRow(-1);
                 for (i = 0; i < columns.length; i++) {
@@ -317,16 +317,16 @@ function getTrackers() {
                     var html = "<select id=\"" + trackerJson[i].tactical + "\" onchange='changeAssignedFlight(\"" + trackerJson[i].tactical + "\", this)'>";
                     var checked;
                     var foundmatch = 0;
-   
+
 
                     teamcell.setAttribute("class", "trackerlist");
                     if (i % 2)
-                        teamcell.setAttribute("style", "background-color: lightsteelblue; white-space: normal; word-wrap: word-break;"); 
- 
- 
+                        teamcell.setAttribute("style", "background-color: lightsteelblue; white-space: normal; word-wrap: word-break;");
+
+
                     for (flight in flightids) {
                         if (flightids[flight] == trackerJson[i].flightid) {
-                            checked = "selected=\"selected\""; 
+                            checked = "selected=\"selected\"";
                             foundmatch = 1;
                         }
                         else
@@ -334,16 +334,16 @@ function getTrackers() {
                         html = html + "<option value=" + flightids[flight] + " " + checked + " >" + flightids[flight] + "</option>";
                     }
                     if (trackerJson[i].flightid == "At Large" || foundmatch == 0)
-                        checked = "selected=\"selected\""; 
+                        checked = "selected=\"selected\"";
                     else
                         checked = "";
                     html = html + "<option value=\"atlarge\" " + checked + " >At Large</option></select>";
-         
+
                     teamcell.innerHTML = "<span style=\"font-size: 1.2em;\"><strong>" + trackerJson[i].tactical + "</strong></span><br>" + html;
                     teamcell.setAttribute("rowspan", trackerkeys.length);
-                  
+
                     var t;
-    
+
                     for (j = 0; j < trackerkeys.length; j++) {
                         if (j > 0) {
                             row = table.insertRow(-1);
@@ -351,25 +351,25 @@ function getTrackers() {
                         teamhtml = "<select id=\"" + trackers[j].callsign + "_tacticalselect\" onchange='changeTrackerTeam(\"" + trackers[j].callsign + "\", this)'>";
                         for (t in teams) {
                            if (trackerJson[i].tactical == teams[t])
-                               checked = "selected=\"selected\""; 
+                               checked = "selected=\"selected\"";
                             else
                                 checked = "";
                             teamhtml = teamhtml + "<option value=\"" + teams[t] + "\" " + checked + " >" + teams[t] + "</option>";
                         }
                         teamhtml = teamhtml + "</select>";
-    
+
                         var cellCallsign = row.insertCell(-1);
                         cellCallsign.setAttribute("class", "trackerlist");
                         if (i % 2)
-                            cellCallsign.setAttribute("style", "background-color: lightsteelblue;"); 
+                            cellCallsign.setAttribute("style", "background-color: lightsteelblue;");
                         cellCallsign.innerHTML = "<span style=\"font-size: 1.1em;font-weight: bold;\">" + trackers[j].callsign + "</span><br><span class=\"lorem\" style=\"color: #303030;\">" + trackers[j].notes;
-    
+
                         var cellFlightid = row.insertCell(-1);
                         cellFlightid.setAttribute("class", "trackerlist");
                         if (i % 2)
-                            cellFlightid.setAttribute("style", "background-color: lightsteelblue;"); 
+                            cellFlightid.setAttribute("style", "background-color: lightsteelblue;");
                         cellFlightid.innerHTML = teamhtml;
-    
+
                     }
                 }
                 tablediv.innerHTML = "";
@@ -411,7 +411,7 @@ function getTrackers() {
             processInTransition = 1;
             var stoppinghtml = "<mark>Shutting down...</mark>";
             $("#systemstatus").html(stoppinghtml);
-            $.get("shutdown.php", function(data) { 
+            $.get("shutdown.php", function(data) {
                 var stoppedhtml = "<mark>Stopped.</mark>";
                 $("#systemstatus").html(stoppedhtml)
                 getProcessStatus();
@@ -428,14 +428,14 @@ function getTrackers() {
     ***********/
     function updateLivePacketStream() {
         if (livePacketStreamState)
-            document.dispatchEvent(updateLivePacketStreamEvent); 
+            document.dispatchEvent(updateLivePacketStreamEvent);
     }
 
 
     /***********
     * clearLivePacketFilters function
     *
-    * This function clears the filter fields on the Live Packet Stream tab 
+    * This function clears the filter fields on the Live Packet Stream tab
     ***********/
     function clearLivePacketFilters() {
         document.getElementById("searchfield").value = "";
@@ -461,50 +461,50 @@ function getTrackers() {
         var searchstring2 = document.getElementById("searchfield2").value;
         var operation = document.getElementById("operation").value;
         var i = 0;
- 
+
         //document.getElementById("debug").innerHTML = operation;
         for (key in keys) {
            if (operation == "and") {
                if (packets[key].packet.toLowerCase().indexOf(searchstring.toLowerCase()) >= 0 &&
                    packets[key].packet.toLowerCase().indexOf(searchstring2.toLowerCase()) >= 0) {
-                   html = html + escapeHtml(packets[key].packet.toString()) + "<br>"; 
+                   html = html + escapeHtml(packets[key].packet.toString()) + "<br>";
                    i += 1;
                }
            }
            else if (operation == "or") {
                //document.getElementById("debug").innerHTML = "in OR section";
-               if (packets[key].packet.toLowerCase().indexOf(searchstring.toLowerCase()) >= 0 || 
+               if (packets[key].packet.toLowerCase().indexOf(searchstring.toLowerCase()) >= 0 ||
                    packets[key].packet.toLowerCase().indexOf(searchstring2.toLowerCase()) >= 0) {
-                   html = html + escapeHtml(packets[key].packet.toString()) + "<br>"; 
+                   html = html + escapeHtml(packets[key].packet.toString()) + "<br>";
                    i += 1;
                }
            }
            else if (operation == "not") {
                //document.getElementById("debug").innerHTML = "in OR section";
                if (searchstring.length > 0 && searchstring2.length > 0) {
-                   if (packets[key].packet.toLowerCase().indexOf(searchstring.toLowerCase()) >= 0 && 
+                   if (packets[key].packet.toLowerCase().indexOf(searchstring.toLowerCase()) >= 0 &&
                        packets[key].packet.toLowerCase().indexOf(searchstring2.toLowerCase()) < 0) {
-                       html = html + escapeHtml(packets[key].packet.toString()) + "<br>"; 
+                       html = html + escapeHtml(packets[key].packet.toString()) + "<br>";
                        i += 1;
                    }
                }
                else if (searchstring.length > 0) {
                    if (packets[key].packet.toLowerCase().indexOf(searchstring.toLowerCase()) >= 0) {
-                       html = html + escapeHtml(packets[key].packet.toString()) + "<br>"; 
+                       html = html + escapeHtml(packets[key].packet.toString()) + "<br>";
                        i += 1;
                    }
                }
                else if (searchstring2.length > 0) {
                    if (packets[key].packet.toLowerCase().indexOf(searchstring2.toLowerCase()) < 0) {
-                       html = html + escapeHtml(packets[key].packet.toString()) + "<br>"; 
+                       html = html + escapeHtml(packets[key].packet.toString()) + "<br>";
                        i += 1;
                    }
                }
                else {
-                   html = html + escapeHtml(packets[key].packet.toString()) + "<br>"; 
+                   html = html + escapeHtml(packets[key].packet.toString()) + "<br>";
                    i += 1;
                }
-               
+
            }
 
         }
@@ -526,11 +526,11 @@ function getTrackers() {
               url = "getallpackets.php";
           else
               url = "getpackets.php?flightid=" + currentflight;
- 
+
           packetdata = {};
-          $.get(url, function(data) { 
+          $.get(url, function(data) {
               packetdata = data;
-              updateLivePacketStream(); 
+              updateLivePacketStream();
           });
         }
     }
@@ -546,7 +546,7 @@ function getTrackers() {
         var selectedValue;
 
         for(var i = 0; i < radios.length; i++) {
-            if(radios[i].checked) selectedValue = radios[i].value;   
+            if(radios[i].checked) selectedValue = radios[i].value;
         }
         return selectedValue;
     }
@@ -601,7 +601,7 @@ function getTrackers() {
         // Create a canvas for ploting balloon markers (those little "+" signs)
         //canvasRenderer = L.canvas({padding: 0.5, tolerance: 5});
 
-        // Create a map object. 
+        // Create a map object.
 	map = new L.Map('map', {
             //renderer : canvasRenderer,
             preferCanvas:  true,
@@ -609,34 +609,34 @@ function getTrackers() {
             layers : [ tilelayer ]
         });
 
-        tilelayer.addTo(map);		
+        tilelayer.addTo(map);
 
         // Pane for all tracks, to put them at the bottom of the z-order
         pathsPane = map.createPane("pathsPane");
-        pathsPane.style.zIndex = 300; 
+        pathsPane.style.zIndex = 300;
 
         // Pane for all flights, to put them at the top of the z-order
         flightPane = map.createPane("flightPane");
-        flightPane.style.zIndex = 670; 
+        flightPane.style.zIndex = 670;
 
         // Pane for all flight Tooltips
         flightTooltipPane = map.createPane("flightTooltipPane");
-        flightTooltipPane.style.zIndex = 680; 
+        flightTooltipPane.style.zIndex = 680;
 
         // Pane for all non-flight tooltips, to put them underneath regular tooltips
         otherTooltipPane = map.createPane("otherTooltipPane");
-        otherTooltipPane.style.zIndex = 640; 
+        otherTooltipPane.style.zIndex = 640;
 
         // Pane for all other stations, to put them underneath regular markers/objects
         otherStationsPane = map.createPane("otherStationsPane");
-        otherStationsPane.style.zIndex = 590; 
+        otherStationsPane.style.zIndex = 590;
 
- 
+
         if (latitude != "" && longitude != "" && zoom != "")
 	    map.setView(new L.LatLng(latitude, longitude), zoom);
         else
 	    map.setView(new L.LatLng(lastposition.geometry.coordinates[1], lastposition.geometry.coordinates[0]), 12);
-        
+
         //document.getElementById("error").innerHTML = "lat:  " + latitude + "   Long:  " + longitude + "  zoom:  " + zoom;
 
         // Layer groups for all stations and just my station.  This allows toggling the visibility of these two groups of objects.
@@ -647,30 +647,30 @@ function getTrackers() {
 
         var a = createRealtimeLayer("getallstations.php", allstations, 5 * 1000, function(){ return { color: 'black'}});
         if (showallstations == 1)
-            a.addTo(map); 
+            a.addTo(map);
 
         createRealtimeLayer("getmystation.php", mystation, 5 * 1000, function(){ return { color: 'black'}}).addTo(map);
         createRealtimeLayer("gettrackerstations.php", trackersatlarge, 5 * 1000, function(){ return { color: 'black'}}).addTo(map);
 
         // The base layers and overlays that will be added to every map
-        var groupedoverlays = { 
+        var groupedoverlays = {
             "Generic Stations" : {
-                "All Other Stations" : allstations, 
-                "Trackers at Large" : trackersatlarge, 
+                "All Other Stations" : allstations,
+                "Trackers at Large" : trackersatlarge,
                 "My Location" : mystation
             }
         };
         baselayer = { "OSM Base Map" : tilelayer };
- 
+
         // use the grouped layers plugin so the layer selection widget shows layers categorized
-        var layerControl = L.control.groupedLayers(baselayer, groupedoverlays, { groupCheckboxes: true}).addTo(map); 
+        var layerControl = L.control.groupedLayers(baselayer, groupedoverlays, { groupCheckboxes: true}).addTo(map);
 
         // This fixes the layer control such that when used on a touchable device (phone/tablet) that it will scroll if there are a lot of layers.
         if (!L.Browser.touch) {
             L.DomEvent
             .disableClickPropagation(layerControl._container)
             .disableScrollPropagation(layerControl._container);
-         } 
+         }
          else {
              L.DomEvent.disableClickPropagation(layerControl._container);
          }
@@ -687,13 +687,13 @@ function getTrackers() {
         */
         var key;
         var key2;
-            
+
         for (key in flightids) {
             //document.getElementById("error").innerHTML = JSON.stringify(flightids[key]);
             var predictedpathlayer = L.layerGroup();
             var landingpredictionlayer = L.layerGroup();
             var trackerstationslayer = L.layerGroup();
-    
+
 
             for (key2 in flightids[key].callsigns) {
                 var activeflightlayer = L.featureGroup();
@@ -702,8 +702,8 @@ function getTrackers() {
                 createActiveFlightsLayer("getactiveflights.php?flightid=" + flightids[key].flightid + "&callsign=" + flightids[key].callsigns[key2], activeflightlayer, 5 * 1000).addTo(map);
                 layerControl.addOverlay(activeflightlayer, flightids[key].callsigns[key2], "Flight:  " + flightids[key].flightid);
             }
-    
-            
+
+
             createRealtimeLayer("gettrackerstations.php?flightid=" + flightids[key].flightid, trackerstationslayer, 5 * 1000, function(){ return { color: 'black'}}).addTo(map);
             createFlightPredictionLayer("getpredictionpaths.php?flightid=" + flightids[key].flightid, predictedpathlayer, 5 * 1000);
             createLandingPredictionsLayer("getlandingpredictions.php?flightid=" + flightids[key].flightid, landingpredictionlayer, 5 * 1000).addTo(map);
@@ -728,7 +728,7 @@ function getTrackers() {
      * This function performs some startup actions and calls "initialize", the primary function for starting the map stuff
     *************/
     function startup() {
-        $.get("getposition.php", function(data) { 
+        $.get("getposition.php", function(data) {
             //document.getElementById("error").innerHTML = "followfeatureid:  " + followfeatureid;
             lastposition = JSON.parse(data);
             initialize();
@@ -800,11 +800,11 @@ function getTrackers() {
             var liveB_e = "#livePacketSearch";
             $(liveA_a).click({element: liveA_e, link: liveA_l }, toggle);
             $(liveB_a).click({element: liveB_e, link: liveB_l }, toggle);
- 
+
             // Build the Live Packet Stream tab
-            livePacketStreamHTML = livePacketStreamHTML + "</form>"; 
+            livePacketStreamHTML = livePacketStreamHTML + "</form>";
             document.getElementById("flightsLivePacketStream").innerHTML = livePacketStreamHTML;
- 
+
             var e = document.getElementById('searchfield');
             e.oninput = updateLivePacketStream;
             e.onpropertychange = e.oninput;
@@ -845,7 +845,7 @@ function getTrackers() {
             });
 
 
-            // Setup the Live Packet Stream event and handler 
+            // Setup the Live Packet Stream event and handler
             updateLivePacketStreamEvent= new CustomEvent("updateLivePacketStreamEvent");
             document.addEventListener("updateLivePacketStreamEvent", displayLivePackets, false);
 
@@ -900,7 +900,7 @@ function getTrackers() {
             var cols = {};
             var altElement = "#" + flightids[flight].flightid + "_altitudechart";
             var vertElement = "#" + flightids[flight].flightid + "_verticalchart";
-            
+
             achart = c3.generate({
                 bindto: altElement,
                 size: { width: 360, height: 250 },
@@ -947,18 +947,18 @@ function getTrackers() {
                     var thisflightid = flight.flightid;
                     var element = "#" + thisflightid + "_altitudechart";
 
-                    for (k = 0; k < chartkeys.length; k++) {  
-    
+                    for (k = 0; k < chartkeys.length; k++) {
+
                         if (! chartkeys[k].startsWith("tm-")) {
                             cols[chartkeys[k]] = "tm-" + chartkeys[k];
                         }
                     }
 
                     //document.getElementById("error2").innerHTML = "thisflightid:  " + thisflightid + "<br>" + JSON.stringify(cols);
-                    
+
                     // Load data into each Altitude chart
                     var achart = $(element).data('altitudeChart');
-                    achart.load({ json: jsondata, xs: cols }); 
+                    achart.load({ json: jsondata, xs: cols });
                  }
              }
         });
@@ -985,18 +985,18 @@ function getTrackers() {
                     var thisflightid = flight.flightid;
                     var element = "#" + thisflightid + "_verticalchart";
 
-                    for (k = 0; k < chartkeys.length; k++) {  
-    
+                    for (k = 0; k < chartkeys.length; k++) {
+
                         if (! chartkeys[k].startsWith("tm-")) {
                             cols[chartkeys[k]] = "tm-" + chartkeys[k];
                         }
                     }
 
                     //document.getElementById("error2").innerHTML = "thisflightid:  " + thisflightid + "<br>" + JSON.stringify(cols);
-                    
+
                     // Load data into each Altitude chart
                     var vchart = $(element).data('verticalChart');
-                    vchart.load({ json: jsondata, xs: cols }); 
+                    vchart.load({ json: jsondata, xs: cols });
                  }
              }
         });
@@ -1040,7 +1040,7 @@ function getTrackers() {
             airspeed = $.flightIndicator(speedInstrument, 'airspeed', { showBox: true, size: 180 });
             relativebearing = $.flightIndicator(relativeBearingInstrument, 'relativeHeading', { showBox: true, size: 180 });
             relativeangle = $.flightIndicator(relativeElevationInstrument, 'elevationAngle', { showBox: true, size: 180 });
- 
+
             $(altitudeValue).data('altimeter', altimeter);
             $(verticalRateValue).data('variometer', variometer);
             $(balloonHeadingValue).data('heading', heading);
@@ -1054,7 +1054,7 @@ function getTrackers() {
     /************
      * dispatchPanToEvent
      *
-     * This function will emit 
+     * This function will emit
     *************/
     function dispatchPanToEvent(lat, lon) {
         var panToEvent = new CustomEvent("MapPanTo", { detail: { lat: lat, lon: lon } });
@@ -1095,14 +1095,14 @@ function getTrackers() {
             $.get("getflightpackets.php?flightid=" + flightid, function(data) {
                 var flightJsonData = JSON.parse(data);
                 var k = 0;
-                 
+
                 var positionPackets = flightJsonData.positionpackets;
                 var statusPackets = flightJsonData.statuspackets;
                 var lastPacketPath = flightJsonData.lastpacketpath;
 
                 k = 0;
                 while (k < 5 && positionPackets[k]) {
-                    var item = positionPackets[k]; 
+                    var item = positionPackets[k];
 
                     $("#" + item.flightid + "_lasttime_" + k).text(item.time.split(" ")[1]);
                     $("#" + item.flightid + "_lastcallsign_" + k).html(
@@ -1112,8 +1112,8 @@ function getTrackers() {
                     $("#" + item.flightid + "_lastvertrate_" + k).text(Math.round(item.verticalrate * 10 / 10).toLocaleString() + " ft/min");
                     $("#" + item.flightid  + "_lastaltitude_" + k).text(Math.round(item.altitude * 10 / 10).toLocaleString() + " ft");
                     k += 1;
-                } 
-                
+                }
+
                 lastPacket = positionPackets[0];
                 if (lastPacket) {
                     lastpacketTime = new Date(lastPacket.time.replace(/ /g, "T"));
@@ -1147,7 +1147,7 @@ function getTrackers() {
                     }
                 }
             });
-                
+
                 // update the time for the last packet
                 //$("#" + flightid + "_sidebar").data("lastpacket", incomingTime);
             //}
@@ -1184,7 +1184,7 @@ function getTrackers() {
                     var thisflightid = flight.flightid;
                     var element = "#" + thisflightid + "_altitudechart";
 
-                    for (k = 0; k < chartkeys.length; k++) {  
+                    for (k = 0; k < chartkeys.length; k++) {
 
                         if (! chartkeys[k].startsWith("tm-")) {
                             cols[chartkeys[k]] = "tm-" + chartkeys[k];
@@ -1192,10 +1192,10 @@ function getTrackers() {
                     }
 
                     //document.getElementById("error2").innerHTML = "thisflightid:  " + thisflightid + "<br>" + JSON.stringify(cols);
-                    
+
                     // Load data into each Altitude chart
                     var achart = $(element).data('altitudeChart');
-                    achart.load({ json: jsondata, xs: cols }); 
+                    achart.load({ json: jsondata, xs: cols });
                  }
              }
         });
@@ -1222,8 +1222,8 @@ function getTrackers() {
                     var thisflightid = flight.flightid;
                     var element = "#" + thisflightid + "_verticalchart";
 
-                    for (k = 0; k < chartkeys.length; k++) {  
-    
+                    for (k = 0; k < chartkeys.length; k++) {
+
                         if (! chartkeys[k].startsWith("tm-")) {
                             cols[chartkeys[k]] = "tm-" + chartkeys[k];
                         }
@@ -1233,7 +1233,7 @@ function getTrackers() {
 
                     // Load data into each Altitude chart
                     var vchart = $(element).data('verticalChart');
-                    vchart.load({ json: jsondata, xs: cols }); 
+                    vchart.load({ json: jsondata, xs: cols });
                  }
              }
         });
@@ -1290,10 +1290,10 @@ function getTrackers() {
                 var fid = jsonData.flightid;
                 var k = 0;
                 var i = 0;
-            
+
                 while (k < 5 && statusPackets[k]) {
                     var item = statusPackets[k];
-          
+
                     $("#" + item.flightid + "_statustime_" + k).text(item.time.split(" ")[1]);
                     $("#" + item.flightid + "_statuscallsign_" + k).text(item.callsign);
                     $("#" + item.flightid + "_statuspacket_" + k).text(item.packet);
@@ -1318,7 +1318,7 @@ function getTrackers() {
                     headerCell.setAttribute("style", "white-space: nowrap;");
                     row.appendChild(headerCell);
                 }
-                
+
                 // Now add the data rows
                 var keys = Object.keys(lastPacketPath);
                 if (keys.length == 0) {
@@ -1371,7 +1371,7 @@ function getTrackers() {
                 var legendcell = row.insertCell(0);
                 legendcell.setAttribute("class", "packetlist");
                 legendcell.setAttribute("colspan", "3");
-                legendcell.innerHTML = "<strong>Legend:</strong> &nbsp; newest----->oldest<br>" 
+                legendcell.innerHTML = "<strong>Legend:</strong> &nbsp; newest----->oldest<br>"
                     + "<span style=\"font-family: monospace; font-size: 1.4em;\"><mark style=\"background-color: lightgreen;\">R</mark></span>"
                     + " - packet received over RF<br>"
                     + "<span style=\"font-family: monospace; font-size: 1.4em;\"><mark style=\"background-color: yellow;\">I</mark></span>"
@@ -1384,7 +1384,7 @@ function getTrackers() {
 
         // Update process status
         getProcessStatus();
-        
+
         // Update the live packet stream tab
         getLivePackets();
 
@@ -1400,8 +1400,8 @@ function getTrackers() {
         <div class="sidebar-tabs">
             <ul role="tablist">
                 <li><a href="#home" role="tab"><img src="/images/graphics/home.png" width="30" height="30"></a></li>
-                <li><a href="#profile" role="tab"><img src="/images/graphics/profile.png" width="30" height="30"></a></li>
-                <li><a href="#messages" role="tab"><img src="/images/graphics/messages.png" width="30" height="30"></a></li>
+<!--                <li><a href="#profile" role="tab"><img src="/images/graphics/profile.png" width="30" height="30"></a></li>      -->
+<!--                <li><a href="#messages" role="tab"><img src="/images/graphics/messages.png" width="30" height="30"></a></li>    -->
 <?php
     if ($numflights > 0) {
         foreach ($flightlist as $row){
@@ -1450,7 +1450,7 @@ function getTrackers() {
             <div class="sidebar-pane" id="messages">
                 <h1 class="sidebar-header">Live Packet Stream<span class="sidebar-close"><img src="/images/graphics/leftcaret.png" width="30" height="30"></span></h1>
                 <p class="section-header">Live Packet Stream: &nbsp; <span id="livePacketStreamState"><mark style="background-color: red;">off</mark></span></p>
-                <p class="lorem">This tab will display all APRS packets received on today's date for a given flight.  
+                <p class="lorem">This tab will display all APRS packets received on today's date for a given flight.
                     Packets are displayed in reverse chronological order with the latest packets on top, oldest on bottom.</p>
 
                 <p class="section-header"><a href="#" class="section-link" id="livePacketFlightSelectionLink">(<span style="color: red;" id="livePacketFlightSelectionSign">-</span>) Select flight</a>:</p>
@@ -1459,7 +1459,7 @@ function getTrackers() {
                     <p><span id="flightsLivePacketStream"></span></p>
                     <p class="section-header"><button name="livepacketstart" id="livepacketstart" >Start</button><button name="livepacketstop" id="livepacketstop">Stop</button></p>
                 </div>
- 
+
                 <p class="section-header"><a href="#" class="section-link" id="livePacketSearchLink">(<span style="color: red;" id="livePacketSearchSign">-</span>) Search</a>:</p>
                 <div id="livePacketSearch">
                     <p class="lorem">Enter search characters to filter the displayed packets.  All searches are case insensitive, so "AAA" is equivalent to "aaa".</p>
@@ -1533,33 +1533,33 @@ function getTrackers() {
         printf ("</div>");
 
         // Relative position section
-        printf ("<p class=\"section-header\"><a href=\"#relative\" class=\"section-link\" id=\"%s\">(<span style=\"color: red;\" id=\"%s\">+</span>) Relative Position</a>: </p>", $row['flightid'] . "_relativepositionlink", $row['flightid'] . "_relativepositionsign");
-        printf ("<div id=\"%s\" style=\"display: none;\">", $row['flightid'] . "_relativeposition");
-        printf ("<div class=\"lowerinstrumentpanel\">");
-        printf ("   <div class=\"column\" style=\"height: 235px;\">");
-        printf ("       <div class=\"rowtop\" style=\"padding-top: 3px;\">");
-        printf ("           <center><div class=\"readouttop\"><p class=\"instrumentvalue\">&nbsp;</p></div></center>");
-        printf ("           <center><span id=\"%s\"></span></center>", $row['flightid'] . "_relativeelevationangle");
-        printf ("           <center><div class=\"readoutbottom\"><p class=\"instrumentvalue\">Angle: <span id=\"%s\"></span> deg</p></div></center>", $row['flightid'] . "_relativeelevationanglevalue");
-        printf ("       </div>");
-        printf ("   </div>");
-        printf ("   <div class=\"column\" style=\"height: 235px;\">");
-        printf ("       <div class=\"rowtop\" style=\"padding-top:  3px;\">");
-        printf ("           <center><div class=\"readouttop\"><p class=\"instrumentvalue\">Hdng: <span id=\"%s\"></span> deg</p></div></center>", $row['flightid'] . "_myheadingvalue");
-        printf ("           <center><span id=\"%s\"></span></center>", $row['flightid'] . "_relativebearing");
-        printf ("           <center><div class=\"readoutbottom\"><p class=\"instrumentvalue\">Brng: <span id=\"%s\"></span> deg</p></div></center>", $row['flightid'] . "_relativebearingvalue");
-        printf ("       </div>");
-        printf ("   </div>");
-//        printf ("   <center><div class=\"readoutbottom\" style=\"width: 360px;\"><p class=\"instrumentvalue\" style=\"width:  360px;\">Distance: <span id=\"%s\"></span> &nbsp; B. Coords: <span id=\"%s\"</span></p></div></center>", $row['flightid'] . "_relativepositiondistance", $row['flightid'] . "_relativeballooncoords");
-        printf ("</div>");
-        printf ("    <table class=\"packetlistpanel\" style=\"width:  360px;\">");
-        printf ("        <tr><td class=\"packetlistheaderpanel\">Distance To Balloon</td>");
-        printf ("            <td class=\"packetlistheaderpanel\">Balloon Coords</td>");
-        printf ("        <tr><td class=\"packetlistpanel\"><mark><span id=\"%s\"</span></mark></td>", $row['flightid'] . "_relativepositiondistance");
-        printf ("            <td class=\"packetlistpanel\"><mark><span id=\"%s\"</span></mark></td>", $row['flightid'] . "_relativeballooncoords");
-        printf ("        </tr>");
-        printf ("    </table>");
-        printf ("</div>");
+//        printf ("<p class=\"section-header\"><a href=\"#relative\" class=\"section-link\" id=\"%s\">(<span style=\"color: red;\" id=\"%s\">+</span>) Relative Position</a>: </p>", $row['flightid'] . "_relativepositionlink", $row['flightid'] . "_relativepositionsign");
+//        printf ("<div id=\"%s\" style=\"display: none;\">", $row['flightid'] . "_relativeposition");
+//        printf ("<div class=\"lowerinstrumentpanel\">");
+//        printf ("   <div class=\"column\" style=\"height: 235px;\">");
+//        printf ("       <div class=\"rowtop\" style=\"padding-top: 3px;\">");
+//        printf ("           <center><div class=\"readouttop\"><p class=\"instrumentvalue\">&nbsp;</p></div></center>");
+//        printf ("           <center><span id=\"%s\"></span></center>", $row['flightid'] . "_relativeelevationangle");
+//        printf ("           <center><div class=\"readoutbottom\"><p class=\"instrumentvalue\">Angle: <span id=\"%s\"></span> deg</p></div></center>", $row['flightid'] . "_relativeelevationanglevalue");
+//        printf ("       </div>");
+//        printf ("   </div>");
+//        printf ("   <div class=\"column\" style=\"height: 235px;\">");
+//        printf ("       <div class=\"rowtop\" style=\"padding-top:  3px;\">");
+//        printf ("           <center><div class=\"readouttop\"><p class=\"instrumentvalue\">Hdng: <span id=\"%s\"></span> deg</p></div></center>", $row['flightid'] . "_myheadingvalue");
+//        printf ("           <center><span id=\"%s\"></span></center>", $row['flightid'] . "_relativebearing");
+//        printf ("           <center><div class=\"readoutbottom\"><p class=\"instrumentvalue\">Brng: <span id=\"%s\"></span> deg</p></div></center>", $row['flightid'] . "_relativebearingvalue");
+//        printf ("       </div>");
+//        printf ("   </div>");
+//  //      printf ("   <center><div class=\"readoutbottom\" style=\"width: 360px;\"><p class=\"instrumentvalue\" style=\"width:  360px;\">Distance: <span id=\"%s\"></span> &nbsp; B. Coords: <span id=\"%s\"</span></p></div></center>", $row['flightid'] . "_relativepositiondistance", $row['flightid'] . "_relativeballooncoords");
+//        printf ("</div>");
+//        printf ("    <table class=\"packetlistpanel\" style=\"width:  360px;\">");
+//        printf ("        <tr><td class=\"packetlistheaderpanel\">Distance To Balloon</td>");
+//        printf ("            <td class=\"packetlistheaderpanel\">Balloon Coords</td>");
+//        printf ("        <tr><td class=\"packetlistpanel\"><mark><span id=\"%s\"</span></mark></td>", $row['flightid'] . "_relativepositiondistance");
+//        printf ("            <td class=\"packetlistpanel\"><mark><span id=\"%s\"</span></mark></td>", $row['flightid'] . "_relativeballooncoords");
+//        printf ("        </tr>");
+//        printf ("    </table>");
+//        printf ("</div>");
 
         // Lastest position packets section
         printf ("<p class=\"section-header\"><a href=\"#positions\" class=\"section-link\" id=\"%s\">(<span style=\"color: red;\" id=\"%s\">+</span>) Most Recent Position Packets</a>:</p>", $row['flightid'] . "_positionpacketlistlink", $row['flightid'] . "_positionpacketlistsign");
